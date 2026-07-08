@@ -1,4 +1,5 @@
 import { User, type IUser } from '../models/User';
+import { Admin, type IAdmin } from '../models/Admin';
 import { StudentProfile } from '../models/StudentProfile';
 import { NGOProfile } from '../models/NGOProfile';
 import { OTP } from '../models/OTP';
@@ -33,11 +34,48 @@ function publicUser(user: IUser) {
   };
 }
 
+/**
+ * Normalizes an Admin document into the same response shape as publicUser,
+ * so the frontend AuthContext and all pages treat admins identically to
+ * students/NGOs. The `role` is always 'admin' so existing redirects work.
+ * Admin-specific fields (adminRole, permissions) are included as extras.
+ */
+function publicAdmin(admin: IAdmin) {
+  return {
+    id: admin._id.toString(),
+    firstName: admin.firstName,
+    lastName: admin.lastName,
+    email: admin.email,
+    phone: '',
+    role: 'admin' as const,
+    status: admin.isSuspended ? 'blocked' : 'active',
+    emailVerified: true,
+    isEmailVerified: true,
+    isActive: admin.isActive,
+    isBlocked: admin.isSuspended,
+    profileCompleted: true,
+    lastLogin: admin.lastLogin ? admin.lastLogin.toISOString() : null,
+    verificationStatus: 'approved' as const,
+    createdAt: admin.createdAt,
+    adminRole: admin.adminRole,
+    permissions: admin.permissions,
+  };
+}
+
 function tokenFor(user: IUser) {
   const payload: JwtPayload = {
     sub: user._id.toString(),
     role: user.role,
     email: user.email,
+  };
+  return signAccessToken(payload);
+}
+
+function adminTokenFor(admin: IAdmin) {
+  const payload: JwtPayload = {
+    sub: admin._id.toString(),
+    role: 'admin' as const,
+    email: admin.email,
   };
   return signAccessToken(payload);
 }
@@ -182,27 +220,53 @@ export const authService = {
   },
 
   async login(email: string, password: string) {
+    // 1. Try the User collection (students + NGOs)
     const user = await User.findOne({ email }).select('+password');
-    if (!user) throw new ApiError(401, 'Invalid email or password', 'INVALID_CREDENTIALS');
+    if (user) {
+      const ok = await user.comparePassword(password);
+      if (!ok) throw new ApiError(401, 'Invalid email or password', 'INVALID_CREDENTIALS');
 
-    const ok = await user.comparePassword(password);
-    if (!ok) throw new ApiError(401, 'Invalid email or password', 'INVALID_CREDENTIALS');
+      if (!user.emailVerified) throw new ApiError(403, 'Please verify your email first', 'EMAIL_NOT_VERIFIED');
+      if (user.isBlocked || user.status === 'blocked') throw new ApiError(403, 'Your account has been blocked', 'BLOCKED');
+      if (user.role === 'ngo' && user.verificationStatus !== 'approved') {
+        throw new ApiError(403, 'Your NGO is pending verification', 'NGO_PENDING');
+      }
 
-    if (!user.emailVerified) throw new ApiError(403, 'Please verify your email first', 'EMAIL_NOT_VERIFIED');
-    if (user.isBlocked || user.status === 'blocked') throw new ApiError(403, 'Your account has been blocked', 'BLOCKED');
-    if (user.role === 'ngo' && user.verificationStatus !== 'approved') {
-      throw new ApiError(403, 'Your NGO is pending verification', 'NGO_PENDING');
+      user.lastLogin = new Date();
+      await user.save();
+
+      const token = tokenFor(user);
+      return { user: publicUser(user), token };
     }
 
-    // Record login timestamp
-    user.lastLogin = new Date();
-    await user.save();
+    // 2. Fall back to the Admin collection
+    const admin = await Admin.findOne({ email }).select('+password');
+    if (admin) {
+      const ok = await admin.comparePassword(password);
+      if (!ok) throw new ApiError(401, 'Invalid email or password', 'INVALID_CREDENTIALS');
 
-    const token = tokenFor(user);
-    return { user: publicUser(user), token };
+      if (!admin.isActive || admin.isSuspended) {
+        throw new ApiError(403, 'Your admin account has been suspended', 'ADMIN_SUSPENDED');
+      }
+
+      admin.lastLogin = new Date();
+      await admin.save();
+
+      const token = adminTokenFor(admin);
+      return { user: publicAdmin(admin), token };
+    }
+
+    throw new ApiError(401, 'Invalid email or password', 'INVALID_CREDENTIALS');
   },
 
-  async getMe(userId: string) {
+  async getMe(userId: string, role?: string) {
+    // If the JWT says admin, resolve from the Admin collection
+    if (role === 'admin') {
+      const admin = await Admin.findById(userId).select('+permissions');
+      if (!admin) throw new ApiError(404, 'Admin not found', 'USER_NOT_FOUND');
+      return { user: publicAdmin(admin) };
+    }
+
     const user = await User.findById(userId);
     if (!user) throw new ApiError(404, 'User not found', 'USER_NOT_FOUND');
     return { user: publicUser(user) };

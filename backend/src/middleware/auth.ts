@@ -3,6 +3,7 @@ import { config } from '../config/env';
 import { verifyToken } from '../utils/jwt';
 import { ApiError } from '../utils/errors';
 import { User } from '../models/User';
+import { Admin } from '../models/Admin';
 import type { Role } from '../models/User';
 
 /**
@@ -24,48 +25,35 @@ declare global {
 /**
  * Requires a valid JWT in the HttpOnly cookie.
  * Attaches the decoded payload to req.user.
+ * Resolves both User (student/ngo) and Admin tokens.
  */
 export const authenticate: RequestHandler = async (req, _res, next) => {
   try {
-    console.log("============== AUTH DEBUG ==============");
-    console.log("Cookies:", req.cookies);
-
     const token = req.cookies?.[config.cookie.name];
-
-    console.log("Cookie name:", config.cookie.name);
-    console.log("Token:", token);
-
     if (!token) {
-      console.log("NO TOKEN FOUND");
-      throw new ApiError(401, "Authentication required", "UNAUTHORIZED");
+      throw new ApiError(401, 'Authentication required', 'UNAUTHORIZED');
     }
-
     const decoded = verifyToken(token);
 
-    console.log("Decoded JWT:", decoded);
-
-    const user = await User.findById(decoded.sub).select("role email status");
-
-    console.log("Mongo User:", user);
-
-    if (!user) {
-      throw new ApiError(401, "User no longer exists", "UNAUTHORIZED");
+    if (decoded.role === 'admin') {
+      const admin = await Admin.findById(decoded.sub).select('email adminRole isActive isSuspended');
+      if (!admin) throw new ApiError(401, 'Admin no longer exists', 'UNAUTHORIZED');
+      if (!admin.isActive || admin.isSuspended) {
+        throw new ApiError(403, 'Your admin account has been suspended', 'BLOCKED');
+      }
+      req.user = { id: decoded.sub, role: 'admin', email: decoded.email };
+    } else {
+      const user = await User.findById(decoded.sub).select('role email status');
+      if (!user) throw new ApiError(401, 'User no longer exists', 'UNAUTHORIZED');
+      if (user.status === 'blocked') {
+        throw new ApiError(403, 'Your account has been blocked', 'BLOCKED');
+      }
+      req.user = { id: decoded.sub, role: decoded.role, email: decoded.email };
     }
-
-    if (user.status === "blocked") {
-      throw new ApiError(403, "Blocked", "BLOCKED");
-    }
-
-    req.user = {
-      id: decoded.sub,
-      role: decoded.role,
-      email: decoded.email,
-    };
-
     next();
   } catch (err) {
-    console.log("AUTH ERROR:", err);
-    next(new ApiError(401, "Invalid session", "UNAUTHORIZED"));
+    if (err instanceof ApiError) return next(err);
+    next(new ApiError(401, 'Invalid or expired session', 'UNAUTHORIZED'));
   }
 };
 

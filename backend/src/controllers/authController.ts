@@ -70,7 +70,7 @@ export const logout: RequestHandler = async (req, res, next) => {
 export const getMe: RequestHandler = async (req, res, next) => {
   try {
     if (!req.user) throw new ApiError(401, 'Authentication required', 'UNAUTHORIZED');
-    const result = await authService.getMe(req.user.id);
+    const result = await authService.getMe(req.user.id, req.user.role);
     res.status(200).json(result);
   } catch (err) {
     next(err);

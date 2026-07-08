@@ -20,7 +20,7 @@ async function start() {
     const shutdown = async (signal: string) => {
       console.log(`[KaamLok] ${signal} received, shutting down...`);
       server.close(() => {
-        mongoose.connection.close().then(() => {
+        mongoose.connection.close(false).then(() => {
           console.log('[KaamLok] MongoDB disconnected');
           process.exit(0);
         });

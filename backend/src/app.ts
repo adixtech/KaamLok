@@ -5,6 +5,11 @@ import cookieParser from 'cookie-parser';
 import rateLimit from 'express-rate-limit';
 import { config } from './config/env';
 import authRoutes from './routes/authRoutes';
+import adminRoutes from './routes/adminRoutes';
+import ngoManagementRoutes from './routes/ngoManagementRoutes';
+import studentManagementRoutes from './routes/studentManagementRoutes';
+import courseRoutes from './routes/courseRoutes';
+import applicationRoutes from './routes/applicationRoutes';
 import { notFound, errorHandler } from './utils/errors';
 
 /**
@@ -44,6 +49,11 @@ export function createApp(): Application {
 
   // Routes
   app.use('/api/auth', authLimiter, authRoutes);
+  app.use('/api/admin', adminRoutes);
+  app.use('/api/admin/ngos', ngoManagementRoutes);
+  app.use('/api/admin/students', studentManagementRoutes);
+  app.use('/api/admin/courses', courseRoutes);
+  app.use('/api/admin/applications', applicationRoutes);
 
   // 404 + error handling
   app.use(notFound);
