@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { Menu, X, ArrowRight } from 'lucide-react';
 import { Logo } from '../Logo';
 import { Button } from '../ui/Button';
@@ -36,7 +37,7 @@ export function Navbar() {
         scrolled ? 'glass border-b border-ink-200/60 shadow-soft' : 'bg-transparent'
       }`}
     >
-      <nav className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:h-18 lg:px-8">
+      <nav className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:h-20 lg:px-8">
         <Logo />
 
         <ul className="hidden items-center gap-1 lg:flex">
@@ -53,21 +54,23 @@ export function Navbar() {
         </ul>
 
         <div className="hidden items-center gap-2 lg:flex">
-          <a
-            href="#login"
+          <Link
+            to="/login"
             className="rounded-2xl px-4 py-2.5 text-sm font-semibold text-ink-700 transition-colors hover:text-brand-700"
           >
             Login
-          </a>
-          <a
-            href="#register"
+          </Link>
+          <Link
+            to="/get-started"
             className="rounded-2xl bg-ink-100 px-4 py-2.5 text-sm font-semibold text-ink-700 transition-colors hover:bg-ink-200"
           >
             Register
-          </a>
-          <Button size="sm" iconRight={<ArrowRight className="h-4 w-4" />}>
-            Explore Programs
-          </Button>
+          </Link>
+          <Link to="/get-started">
+            <Button size="sm" iconRight={<ArrowRight className="h-4 w-4" />}>
+              Explore Programs
+            </Button>
+          </Link>
         </div>
 
         <button
@@ -101,29 +104,30 @@ export function Navbar() {
             ))}
           </ul>
           <div className="mt-3 grid grid-cols-2 gap-2 border-t border-ink-200/60 pt-3">
-            <a
-              href="#login"
+            <Link
+              to="/login"
               onClick={() => setOpen(false)}
               className="rounded-2xl bg-ink-100 px-4 py-3 text-center text-sm font-semibold text-ink-700"
             >
               Login
-            </a>
-            <a
-              href="#register"
+            </Link>
+            <Link
+              to="/get-started"
               onClick={() => setOpen(false)}
               className="rounded-2xl bg-ink-100 px-4 py-3 text-center text-sm font-semibold text-ink-700"
             >
               Register
-            </a>
+            </Link>
           </div>
-          <Button
-            full
-            className="mt-2"
-            iconRight={<ArrowRight className="h-4 w-4" />}
-            onClick={() => setOpen(false)}
-          >
-            Explore Programs
-          </Button>
+          <Link to="/get-started" onClick={() => setOpen(false)}>
+            <Button
+              full
+              className="mt-2"
+              iconRight={<ArrowRight className="h-4 w-4" />}
+            >
+              Explore Programs
+            </Button>
+          </Link>
         </div>
       </div>
     </header>

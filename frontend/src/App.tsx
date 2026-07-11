@@ -1,5 +1,5 @@
 import { lazy, Suspense } from 'react';
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
 import { AuthProvider } from './context/AuthContext';
 import { ProtectedRoute, RoleRoute, PublicOnlyRoute } from './components/auth/ProtectedRoute';
@@ -15,7 +15,7 @@ import { Login } from './pages/auth/Login';
 import { ForgotPassword } from './pages/auth/ForgotPassword';
 import { ResetPassword } from './pages/auth/ResetPassword';
 import { PendingApproval } from './pages/auth/PendingApproval';
-import { StudentDashboard, NGODashboard } from './pages/dashboards/Dashboards';
+import { StudentDashboardPage } from './pages/student/StudentDashboardPage';
 
 // Lazy-loaded admin pages for code splitting
 const AdminDashboardPage = lazy(() => import('./pages/admin/AdminDashboardPage').then((m) => ({ default: m.AdminDashboardPage })));
@@ -31,21 +31,52 @@ const SettingsPage = lazy(() => import('./pages/admin/SettingsPage').then((m) =>
 const ReportsPage = lazy(() => import('./pages/admin/ReportsPage').then((m) => ({ default: m.ReportsPage })));
 const CompaniesPage = lazy(() => import('./pages/admin/CompaniesPage').then((m) => ({ default: m.CompaniesPage })));
 
+// Lazy-loaded NGO pages
+const NGODashboardPage = lazy(() => import('./pages/ngo/NGODashboardPage').then((m) => ({ default: m.NGODashboardPage })));
+const MyCoursesPage = lazy(() => import('./pages/ngo/MyCoursesPage').then((m) => ({ default: m.MyCoursesPage })));
+const StudentApplicationsPage = lazy(() => import('./pages/ngo/StudentApplicationsPage').then((m) => ({ default: m.StudentApplicationsPage })));
+const OrganizationProfilePage = lazy(() => import('./pages/ngo/OrganizationProfilePage').then((m) => ({ default: m.OrganizationProfilePage })));
+const CreateCoursePage = lazy(() => import('./components/ngo/CreateCourseWizard').then((m) => ({ default: m.CreateCoursePage })));
+const InterviewsPage = lazy(() => import('./pages/ngo/InterviewsPage').then((m) => ({ default: m.InterviewsPage })));
+const MessagesPage = lazy(() => import('./pages/ngo/MessagesPage').then((m) => ({ default: m.MessagesPage })));
+const NGOAnalyticsPage = lazy(() => import('./pages/ngo/NGOAnalyticsPage').then((m) => ({ default: m.NGOAnalyticsPage })));
+const NGODocumentsPage = lazy(() => import('./pages/ngo/NGODocumentsPage').then((m) => ({ default: m.NGODocumentsPage })));
+const NGONotificationsPage = lazy(() => import('./pages/ngo/NGONotificationsPage').then((m) => ({ default: m.NGONotificationsPage })));
+const NGOSettingsPage = lazy(() => import('./pages/ngo/NGOSettingsPage').then((m) => ({ default: m.NGOSettingsPage })));
+
 function AdminSuspense({ children }: { children: React.ReactNode }) {
   return <Suspense fallback={<FullScreenLoader label="Loading admin..." />}>{children}</Suspense>;
 }
 
+function NGOSuspense({ children }: { children: React.ReactNode }) {
+  return <Suspense fallback={<FullScreenLoader label="Loading..." />}>{children}</Suspense>;
+}
+
 /**
- * NGO route guard: approved NGOs see their dashboard; everyone else
- * with the ngo role sees the pending-approval page.
+ * NGO route guard: approved NGOs see their full dashboard; unapproved NGOs
+ * see the pending-approval page.
  */
-function NGORoute() {
+// function NGOApprovedRoute({ children }: { children: React.ReactNode }) {
+//   const { user, loading } = useAuth();
+//   if (loading) return <FullScreenLoader />;
+//   if (user?.role !== 'ngo') return <Navigate to="/login" replace />;
+//   if (user.verificationStatus !== 'approved') {
+//     return <PendingApproval />;
+//   }
+//   return <>{children}</>;
+// }
+
+//changes be me to fixed the issue of ngo approved route so the pending page not come in dashoard route
+function NGOApprovedRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
   if (loading) return <FullScreenLoader />;
-  if (user?.role === 'ngo' && user.verificationStatus !== 'approved') {
-    return <PendingApproval />;
+  if (user?.role !== 'ngo') return <Navigate to="/login" replace />;
+  
+  // 🟢 FIXED: Safely redirect the browser to a dedicated non-dashboard route
+  if (user.verificationStatus !== 'approved') {
+    return <Navigate to="/pending-approval" replace />;
   }
-  return <NGODashboard />;
+  return <>{children}</>;
 }
 
 function AppRoutes() {
@@ -61,10 +92,103 @@ function AppRoutes() {
       <Route path="/forgot-password" element={<ForgotPassword />} />
       <Route path="/reset-password" element={<ResetPassword />} />
 
-      {/* Private — role-scoped */}
-      <Route path="/student/dashboard" element={<ProtectedRoute><RoleRoute roles={['student']}><StudentDashboard /></RoleRoute></ProtectedRoute>} />
-      <Route path="/ngo/dashboard" element={<ProtectedRoute><RoleRoute roles={['ngo']}><NGORoute /></RoleRoute></ProtectedRoute>} />
-      <Route path="/ngo/pending" element={<ProtectedRoute><RoleRoute roles={['ngo']}><PendingApproval /></RoleRoute></ProtectedRoute>} />
+//abbd by me to fix the ngo approved personal page
+        {/* 🟢 ADD THIS LINE HERE */}
+      <Route path="/pending-approval" element={<PendingApproval />} />
+      
+      {/* Student Routes */}
+      <Route path="/student/dashboard" element={<ProtectedRoute><RoleRoute roles={['student']}><StudentDashboardPage /></RoleRoute></ProtectedRoute>} />
+
+      {/* NGO Routes — Full Dashboard for Approved NGOs */}
+      <Route path="/ngo/dashboard" element={
+        <ProtectedRoute>
+          <NGOApprovedRoute>
+            <NGOSuspense><NGODashboardPage /></NGOSuspense>
+          </NGOApprovedRoute>
+        </ProtectedRoute>
+      } />
+      <Route path="/ngo/courses" element={
+        <ProtectedRoute>
+          <NGOApprovedRoute>
+            <NGOSuspense><MyCoursesPage /></NGOSuspense>
+          </NGOApprovedRoute>
+        </ProtectedRoute>
+      } />
+      <Route path="/ngo/courses/create" element={
+        <ProtectedRoute>
+          <NGOApprovedRoute>
+            <NGOSuspense><CreateCoursePage /></NGOSuspense>
+          </NGOApprovedRoute>
+        </ProtectedRoute>
+      } />
+      <Route path="/ngo/courses/:id/edit" element={
+        <ProtectedRoute>
+          <NGOApprovedRoute>
+            <NGOSuspense><CreateCoursePage /></NGOSuspense>
+          </NGOApprovedRoute>
+        </ProtectedRoute>
+      } />
+      <Route path="/ngo/applications" element={
+        <ProtectedRoute>
+          <NGOApprovedRoute>
+            <NGOSuspense><StudentApplicationsPage /></NGOSuspense>
+          </NGOApprovedRoute>
+        </ProtectedRoute>
+      } />
+      <Route path="/ngo/interviews" element={
+        <ProtectedRoute>
+          <NGOApprovedRoute>
+            <NGOSuspense><InterviewsPage /></NGOSuspense>
+          </NGOApprovedRoute>
+        </ProtectedRoute>
+      } />
+      <Route path="/ngo/messages" element={
+        <ProtectedRoute>
+          <NGOApprovedRoute>
+            <NGOSuspense><MessagesPage /></NGOSuspense>
+          </NGOApprovedRoute>
+        </ProtectedRoute>
+      } />
+      <Route path="/ngo/analytics" element={
+        <ProtectedRoute>
+          <NGOApprovedRoute>
+            <NGOSuspense><NGOAnalyticsPage /></NGOSuspense>
+          </NGOApprovedRoute>
+        </ProtectedRoute>
+      } />
+      <Route path="/ngo/documents" element={
+        <ProtectedRoute>
+          <NGOApprovedRoute>
+            <NGOSuspense><NGODocumentsPage /></NGOSuspense>
+          </NGOApprovedRoute>
+        </ProtectedRoute>
+      } />
+      <Route path="/ngo/notifications" element={
+        <ProtectedRoute>
+          <NGOApprovedRoute>
+            <NGOSuspense><NGONotificationsPage /></NGOSuspense>
+          </NGOApprovedRoute>
+        </ProtectedRoute>
+      } />
+      <Route path="/ngo/settings" element={
+        <ProtectedRoute>
+          <NGOApprovedRoute>
+            <NGOSuspense><NGOSettingsPage /></NGOSuspense>
+          </NGOApprovedRoute>
+        </ProtectedRoute>
+      } />
+      <Route path="/ngo/profile" element={
+        <ProtectedRoute>
+          <RoleRoute roles={['ngo']}>
+            <NGOSuspense><OrganizationProfilePage /></NGOSuspense>
+          </RoleRoute>
+        </ProtectedRoute>
+      } />
+      <Route path="/ngo/pending" element={
+        <ProtectedRoute>
+          <RoleRoute roles={['ngo']}><PendingApproval /></RoleRoute>
+        </ProtectedRoute>
+      } />
 
       {/* Admin — full admin module */}
       <Route path="/admin/dashboard" element={<ProtectedRoute><RoleRoute roles={['admin']}><AdminSuspense><AdminDashboardPage /></AdminSuspense></RoleRoute></ProtectedRoute>} />

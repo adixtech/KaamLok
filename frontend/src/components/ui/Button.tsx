@@ -10,6 +10,7 @@ type Props = ButtonHTMLAttributes<HTMLButtonElement> & {
   icon?: ReactNode;
   iconRight?: ReactNode;
   full?: boolean;
+  loading?: boolean;
 };
 
 const base =
@@ -40,15 +41,22 @@ export function Button({
   icon,
   iconRight,
   full,
+  loading = false,
+  disabled,
   className = '',
   ...rest
 }: Props) {
   return (
     <button
       className={`${base} ${sizes[size]} ${variants[variant]} ${full ? 'w-full' : ''} ${className}`}
+      disabled={disabled || loading}
       {...rest}
     >
-      {icon && <span className="shrink-0">{icon}</span>}
+      {loading ? (
+        <span className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+      ) : (
+        icon && <span className="shrink-0">{icon}</span>
+      )}
       <span>{children}</span>
       {iconRight && (
         <span className="shrink-0 transition-transform duration-300 group-hover:translate-x-0.5">

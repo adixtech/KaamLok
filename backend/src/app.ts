@@ -10,6 +10,8 @@ import ngoManagementRoutes from './routes/ngoManagementRoutes';
 import studentManagementRoutes from './routes/studentManagementRoutes';
 import courseRoutes from './routes/courseRoutes';
 import applicationRoutes from './routes/applicationRoutes';
+import ngoRoutes from './routes/ngoRoutes';
+import publicRoutes from './routes/publicRoutes';
 import { notFound, errorHandler } from './utils/errors';
 
 /**
@@ -35,8 +37,10 @@ export function createApp(): Application {
 
   // Rate limiting — stricter for auth endpoints
   const authLimiter = rateLimit({
-    windowMs: config.rateLimit.windowMs,
-    max: config.rateLimit.authMax,
+    windowMs: 15 * 60 * 1000,
+    max: 1000, // 👈 Temporary high number so localhost won't lock you out
+    // windowMs: config.rateLimit.windowMs,
+    // max: config.rateLimit.authMax,
     message: { message: 'Too many requests. Please try again later.', code: 'RATE_LIMITED' },
     standardHeaders: true,
     legacyHeaders: false,
@@ -54,6 +58,8 @@ export function createApp(): Application {
   app.use('/api/admin/students', studentManagementRoutes);
   app.use('/api/admin/courses', courseRoutes);
   app.use('/api/admin/applications', applicationRoutes);
+  app.use('/api/ngo', ngoRoutes);
+  app.use('/api/public', publicRoutes);
 
   // 404 + error handling
   app.use(notFound);
