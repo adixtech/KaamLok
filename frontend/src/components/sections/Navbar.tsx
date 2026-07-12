@@ -5,12 +5,12 @@ import { Logo } from '../Logo';
 import { Button } from '../ui/Button';
 
 const links = [
-  { label: 'Home', href: '#home' },
-  { label: 'Programs', href: '#programs' },
-  { label: 'NGOs', href: '#ngos' },
-  { label: 'Success Stories', href: '#stories' },
-  { label: 'About', href: '#about' },
-  { label: 'Contact', href: '#contact' },
+  { label: 'Home', to: '/' },
+  { label: 'Programs', to: '/programs' },
+  { label: 'NGOs', to: '/#ngos' },
+  { label: 'Success Stories', to: '/success-stories' },
+  { label: 'About', to: '/#about' },
+  { label: 'Contact', to: '/contact' },
 ];
 
 export function Navbar() {
@@ -42,13 +42,13 @@ export function Navbar() {
 
         <ul className="hidden items-center gap-1 lg:flex">
           {links.map((l) => (
-            <li key={l.href}>
-              <a
-                href={l.href}
+            <li key={l.to}>
+              <Link
+                to={l.to}
                 className="rounded-lg px-3.5 py-2 text-sm font-medium text-ink-600 transition-colors duration-200 hover:bg-ink-100 hover:text-brand-700"
               >
                 {l.label}
-              </a>
+              </Link>
             </li>
           ))}
         </ul>
@@ -66,7 +66,7 @@ export function Navbar() {
           >
             Register
           </Link>
-          <Link to="/get-started">
+          <Link to="/programs">
             <Button size="sm" iconRight={<ArrowRight className="h-4 w-4" />}>
               Explore Programs
             </Button>
@@ -92,14 +92,14 @@ export function Navbar() {
         <div className="glass mx-3 mb-3 rounded-3xl border border-ink-200/60 p-4 shadow-card">
           <ul className="flex flex-col">
             {links.map((l) => (
-              <li key={l.href}>
-                <a
-                  href={l.href}
+              <li key={l.to}>
+                <Link
+                  to={l.to}
                   onClick={() => setOpen(false)}
                   className="block rounded-xl px-4 py-3 text-sm font-medium text-ink-700 transition-colors hover:bg-brand-50 hover:text-brand-700"
                 >
                   {l.label}
-                </a>
+                </Link>
               </li>
             ))}
           </ul>
@@ -119,7 +119,7 @@ export function Navbar() {
               Register
             </Link>
           </div>
-          <Link to="/get-started" onClick={() => setOpen(false)}>
+          <Link to="/programs" onClick={() => setOpen(false)}>
             <Button
               full
               className="mt-2"

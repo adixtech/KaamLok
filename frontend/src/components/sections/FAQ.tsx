@@ -3,6 +3,7 @@ import { Plus, Minus, HelpCircle } from 'lucide-react';
 import { SectionHeading } from '../ui/SectionHeading';
 import { Reveal } from '../Reveal';
 import { Button } from '../ui/Button';
+import { Link } from 'react-router-dom';
 
 const faqs = [
   {
@@ -63,9 +64,12 @@ export function FAQ() {
                 <p className="mt-1.5 text-sm text-ink-500">
                   Our team is here to help students and NGOs find the right fit.
                 </p>
+                //only changes in this page is add link around the button for opening the contact form
+                <Link to="/contact">
                 <Button variant="secondary" size="sm" className="mt-4">
                   Contact Support
                 </Button>
+                </Link>
               </div>
             </Reveal>
           </div>

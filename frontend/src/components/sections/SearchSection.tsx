@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Search, MapPin, GraduationCap, Building2, ArrowRight, X } from 'lucide-react';
 import { Reveal } from '../Reveal';
 
@@ -18,11 +19,22 @@ const quickFilters = [
 ];
 
 export function SearchSection() {
+  const navigate = useNavigate();
   const [active, setActive] = useState<string[]>(['12th Pass', 'Online']);
   const [query, setQuery] = useState('');
 
   const toggle = (f: string) =>
     setActive((prev) => (prev.includes(f) ? prev.filter((x) => x !== f) : [...prev, f]));
+
+  const handleSearch = () => {
+    const params = new URLSearchParams();
+    if (query) params.set('search', query);
+    const mode = active.find((a) => ['Online', 'Offline', 'Hybrid'].includes(a.toLowerCase()));
+    if (mode) params.set('mode', mode.toLowerCase());
+    const category = active.find((a) => !['Online', 'Offline', 'Hybrid'].includes(a.toLowerCase()));
+    if (category) params.set('category', category);
+    navigate(`/programs?${params.toString()}`);
+  };
 
   return (
     <section className="relative z-10 -mt-8 px-4 sm:px-6 lg:px-8">
@@ -35,16 +47,20 @@ export function SearchSection() {
               <input
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
                 placeholder="Search by course or skill..."
                 className="w-full rounded-2xl border border-ink-200 bg-ink-50/60 py-3.5 pl-12 pr-4 text-sm font-medium text-ink-800 placeholder:text-ink-400 transition-colors focus:border-brand-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-100"
               />
             </div>
-            <div className="grid grid-cols-3 gap-2 sm:flex sm:items-center">
+            <div className="grid grid-cols-1 gap-2 sm:flex sm:items-center">
               <FieldSelect icon={MapPin} label="City" options={['Mumbai', 'Delhi', 'Bengaluru', 'Pune', 'Jaipur']} />
               <FieldSelect icon={GraduationCap} label="Eligibility" options={['10th Pass', '12th Pass', 'Graduate', 'Diploma']} />
               <FieldSelect icon={Building2} label="NGO" options={['All NGOs', 'Pratham', 'Smile Foundation', 'Lakshya']} />
             </div>
-            <button className="group inline-flex items-center justify-center gap-2 rounded-2xl bg-brand-600 px-6 py-3.5 text-sm font-semibold text-white shadow-soft transition-all hover:bg-brand-700 hover:shadow-float">
+            <button
+              onClick={handleSearch}
+              className="group inline-flex items-center justify-center gap-2 rounded-2xl bg-brand-600 px-6 py-3.5 text-sm font-semibold text-white shadow-soft transition-all hover:bg-brand-700 hover:shadow-float"
+            >
               <Search className="h-4 w-4" />
               Search
             </button>

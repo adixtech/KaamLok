@@ -1,15 +1,39 @@
-import { ArrowRight, Sparkles, Mail, Phone, MapPin } from 'lucide-react';
+import { useState } from 'react';
+import { ArrowRight, Sparkles, Mail, Phone, MapPin, CheckCircle2, AlertCircle } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import toast from 'react-hot-toast';
 import { Button } from '../ui/Button';
 import { Reveal } from '../Reveal';
 import { Logo } from '../Logo';
+import { publicApi } from '../../services/publicApi';
 
-const footerLinks = {
-  Company: ['About Us', 'Our Mission', 'Careers', 'Press', 'Blog'],
-  Programs: ['IT & Software', 'Retail', 'Healthcare', 'Finance', 'Hospitality', 'Digital Skills'],
-  NGOs: ['Partner With Us', 'Verification Process', 'NGO Dashboard', 'Resources'],
-  Resources: ['Student Guide', 'Career Tips', 'Success Stories', 'Community', 'Help Center'],
-  Support: ['Contact Us', 'Privacy Policy', 'Terms of Service', 'Cookie Policy'],
+const footerLinks: Record<string, { label: string; to: string }[]> = {
+  Company: [
+    { label: 'About Us', to: '/#about' },
+    { label: 'Our Mission', to: '/#about' },
+    { label: 'How It Works', to: '/#how-it-works' },
+    { label: 'Impact', to: '/#impact' },
+  ],
+  Programs: [
+    { label: 'All Programs', to: '/programs' },
+    { label: 'Featured Programs', to: '/#programs' },
+    { label: 'Success Stories', to: '/success-stories' },
+  ],
+  NGOs: [
+    { label: 'Partner With Us', to: '/register/ngo' },
+    { label: 'NGO Dashboard', to: '/ngo/dashboard' },
+    { label: 'How It Works', to: '/#how-it-works' },
+  ],
+  Resources: [
+    { label: 'Student Guide', to: '/get-started' },
+    { label: 'Success Stories', to: '/success-stories' },
+    { label: 'FAQ', to: '/#faq' },
+    { label: 'Help Center', to: '/contact' },
+  ],
+  Support: [
+    { label: 'Contact Us', to: '/contact' },
+    { label: 'FAQ', to: '/#faq' },
+  ],
 };
 
 const socials = [
@@ -64,7 +88,7 @@ export function FinalCTA() {
               Join 15,000+ students who discovered free, verified programs and started their career journeys with KaamLok.
             </p>
             <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
-              <Link to="/get-started">
+              <Link to="/programs">
                 <Button variant="amber" size="lg" iconRight={<ArrowRight className="h-5 w-5" />}>
                   Explore Programs
                 </Button>
@@ -87,6 +111,35 @@ export function FinalCTA() {
 }
 
 export function Footer() {
+  const [email, setEmail] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [subscribed, setSubscribed] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const handleSubscribe = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      setError('Please enter a valid email address');
+      return;
+    }
+    setError(null);
+    try {
+      setLoading(true);
+      const result = await publicApi.subscribeNewsletter(email);
+      toast.success(result.message);
+      setSubscribed(true);
+      setEmail('');
+    } catch (err) {
+      const e = err as { message?: string };
+      const msg = e?.message || 'Failed to subscribe. Please try again.';
+      setError(msg);
+      toast.error(msg);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <footer className="relative overflow-hidden bg-ink-900 pt-16 pb-8">
       <div className="absolute inset-0 bg-dots opacity-5" />
@@ -101,17 +154,39 @@ export function Footer() {
               Join our newsletter for the latest free programs, deadlines, and career tips — no spam, ever.
             </p>
           </div>
-          <form className="flex flex-col gap-3 sm:flex-row" onSubmit={(e) => e.preventDefault()}>
-            <input
-              type="email"
-              required
-              placeholder="Enter your email address"
-              className="flex-1 rounded-2xl border border-white/10 bg-white/5 px-4 py-3.5 text-sm font-medium text-white placeholder:text-ink-400 transition-colors focus:border-brand-400 focus:bg-white/10 focus:outline-none focus:ring-2 focus:ring-brand-500/30"
-            />
-            <Button type="submit" size="md" iconRight={<ArrowRight className="h-4 w-4" />}>
-              Subscribe
-            </Button>
-          </form>
+          <div>
+            {subscribed ? (
+              <div className="flex items-center gap-3 rounded-2xl bg-emerald-500/10 p-4 ring-1 ring-emerald-500/20">
+                <CheckCircle2 className="h-6 w-6 shrink-0 text-emerald-400" />
+                <div>
+                  <p className="text-sm font-semibold text-emerald-300">You're subscribed!</p>
+                  <p className="text-xs text-ink-400">We'll send you the latest programs and updates.</p>
+                </div>
+              </div>
+            ) : (
+              <form className="flex flex-col gap-3 sm:flex-row" onSubmit={handleSubscribe}>
+                <div className="flex-1">
+                  <input
+                    type="email"
+                    required
+                    value={email}
+                    onChange={(e) => { setEmail(e.target.value); setError(null); }}
+                    placeholder="Enter your email address"
+                    className="w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3.5 text-sm font-medium text-white placeholder:text-ink-400 transition-colors focus:border-brand-400 focus:bg-white/10 focus:outline-none focus:ring-2 focus:ring-brand-500/30"
+                  />
+                  {error && (
+                    <p className="mt-1.5 flex items-center gap-1 text-xs font-medium text-rose-400">
+                      <AlertCircle className="h-3 w-3" />
+                      {error}
+                    </p>
+                  )}
+                </div>
+                <Button type="submit" size="md" loading={loading} iconRight={!loading ? <ArrowRight className="h-4 w-4" /> : undefined}>
+                  Subscribe
+                </Button>
+              </form>
+            )}
+          </div>
         </div>
 
         {/* Links */}
@@ -129,7 +204,7 @@ export function Footer() {
                 <Phone className="h-3.5 w-3.5" /> +91 98765 43210
               </p>
               <p className="flex items-center gap-2">
-                <MapPin className="h-3.5 w-3.5" /> Bengaluru, India
+                <MapPin className="h-3.5 w-3.5" /> Mumbai, India
               </p>
             </div>
           </div>
@@ -139,13 +214,13 @@ export function Footer() {
               <h4 className="text-sm font-bold text-white">{heading}</h4>
               <ul className="mt-4 space-y-2.5">
                 {items.map((item) => (
-                  <li key={item}>
-                    <a
-                      href="#"
+                  <li key={item.label}>
+                    <Link
+                      to={item.to}
                       className="text-sm text-ink-400 transition-colors hover:text-brand-300"
                     >
-                      {item}
-                    </a>
+                      {item.label}
+                    </Link>
                   </li>
                 ))}
               </ul>

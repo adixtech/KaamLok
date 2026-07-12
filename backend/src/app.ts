@@ -11,6 +11,9 @@ import studentManagementRoutes from './routes/studentManagementRoutes';
 import courseRoutes from './routes/courseRoutes';
 import applicationRoutes from './routes/applicationRoutes';
 import ngoRoutes from './routes/ngoRoutes';
+//add for students
+import studentRoutes from './routes/studentRoutes';
+//end 
 import publicRoutes from './routes/publicRoutes';
 import { notFound, errorHandler } from './utils/errors';
 
@@ -59,6 +62,10 @@ export function createApp(): Application {
   app.use('/api/admin/courses', courseRoutes);
   app.use('/api/admin/applications', applicationRoutes);
   app.use('/api/ngo', ngoRoutes);
+  //add for students
+  app.use('/api/student', studentRoutes);
+  //end
+  app.use('/api/courses', courseRoutes);
   app.use('/api/public', publicRoutes);
 
   // 404 + error handling

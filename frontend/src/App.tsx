@@ -7,6 +7,14 @@ import { FullScreenLoader } from './components/ui/Loading';
 import { useAuth } from './context/AuthContext';
 
 import { LandingPage } from './pages/LandingPage';
+//add by me for course page to ngo integration 5 lines
+import { AllProgramsPage } from './pages/public/AllProgramsPage';
+import { CourseDetailsPage } from './pages/public/CourseDetailsPage';
+import { NGOPublicProfilePage } from './pages/public/NGOPublicProfilePage';
+import { SuccessStoriesPage } from './pages/public/SuccessStoriesPage';
+import { ContactSupportPage } from './pages/public/ContactSupportPage';
+//end by me for course page to ngo integration 5 lines
+
 import { GetStarted } from './pages/auth/GetStarted';
 import { StudentRegister } from './pages/auth/StudentRegister';
 import { NGORegister } from './pages/auth/NGORegister';
@@ -91,11 +99,18 @@ function AppRoutes() {
       <Route path="/verify-otp" element={<VerifyOTP />} />
       <Route path="/forgot-password" element={<ForgotPassword />} />
       <Route path="/reset-password" element={<ResetPassword />} />
+      {/* Public pages (course/ngo marketing) */}
+      <Route path="/programs" element={<AllProgramsPage />} />
+      <Route path="/courses/:slug" element={<CourseDetailsPage />} />
+      <Route path="/ngos/:slug" element={<NGOPublicProfilePage />} />
+      <Route path="/success-stories" element={<SuccessStoriesPage />} />
+      <Route path="/contact" element={<ContactSupportPage />} />
 
-//abbd by me to fix the ngo approved personal page
+
+    //abbd by me to fix the ngo approved personal page
         {/* 🟢 ADD THIS LINE HERE */}
       <Route path="/pending-approval" element={<PendingApproval />} />
-      
+
       {/* Student Routes */}
       <Route path="/student/dashboard" element={<ProtectedRoute><RoleRoute roles={['student']}><StudentDashboardPage /></RoleRoute></ProtectedRoute>} />
 
