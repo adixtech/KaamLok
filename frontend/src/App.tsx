@@ -25,6 +25,21 @@ import { ResetPassword } from './pages/auth/ResetPassword';
 import { PendingApproval } from './pages/auth/PendingApproval';
 import { StudentDashboardPage } from './pages/student/StudentDashboardPage';
 
+
+// Lazy-loaded student pages
+const DiscoverCoursesPage = lazy(() => import('./pages/student/DiscoverCoursesPage').then((m) => ({ default: m.DiscoverCoursesPage })));
+const NGODirectoryPage = lazy(() => import('./pages/student/NGODirectoryPage').then((m) => ({ default: m.NGODirectoryPage })));
+const MyApplicationsPage = lazy(() => import('./pages/student/MyApplicationsPage').then((m) => ({ default: m.MyApplicationsPage })));
+const SavedCoursesPage = lazy(() => import('./pages/student/SavedCoursesPage').then((m) => ({ default: m.SavedCoursesPage })));
+const StudentInterviewsPage = lazy(() => import('./pages/student/StudentInterviewsPage').then((m) => ({ default: m.StudentInterviewsPage })));
+const StudentTrainingPage = lazy(() => import('./pages/student/StudentTrainingPage').then((m) => ({ default: m.StudentTrainingPage })));
+const StudentCertificatesPage = lazy(() => import('./pages/student/StudentCertificatesPage').then((m) => ({ default: m.StudentCertificatesPage })));
+const StudentMessagesPage = lazy(() => import('./pages/student/StudentMessagesPage').then((m) => ({ default: m.StudentMessagesPage })));
+const StudentNotificationsPage = lazy(() => import('./pages/student/StudentNotificationsPage').then((m) => ({ default: m.StudentNotificationsPage })));
+const StudentProfilePage = lazy(() => import('./pages/student/StudentProfilePage').then((m) => ({ default: m.StudentProfilePage })));
+const StudentSettingsPage = lazy(() => import('./pages/student/StudentSettingsPage').then((m) => ({ default: m.StudentSettingsPage })));
+
+
 // Lazy-loaded admin pages for code splitting
 const AdminDashboardPage = lazy(() => import('./pages/admin/AdminDashboardPage').then((m) => ({ default: m.AdminDashboardPage })));
 const NGOManagementPage = lazy(() => import('./pages/admin/NGOManagementPage').then((m) => ({ default: m.NGOManagementPage })));
@@ -60,6 +75,9 @@ function NGOSuspense({ children }: { children: React.ReactNode }) {
   return <Suspense fallback={<FullScreenLoader label="Loading..." />}>{children}</Suspense>;
 }
 
+function StudentSuspense({ children }: { children: React.ReactNode }) {
+  return <Suspense fallback={<FullScreenLoader label="Loading..." />}>{children}</Suspense>;
+}
 /**
  * NGO route guard: approved NGOs see their full dashboard; unapproved NGOs
  * see the pending-approval page.
@@ -111,8 +129,19 @@ function AppRoutes() {
         {/* 🟢 ADD THIS LINE HERE */}
       <Route path="/pending-approval" element={<PendingApproval />} />
 
-      {/* Student Routes */}
+      //Students Routes — Full Dashboard for Students....
       <Route path="/student/dashboard" element={<ProtectedRoute><RoleRoute roles={['student']}><StudentDashboardPage /></RoleRoute></ProtectedRoute>} />
+      <Route path="/student/discover" element={<ProtectedRoute><RoleRoute roles={['student']}><StudentSuspense><DiscoverCoursesPage /></StudentSuspense></RoleRoute></ProtectedRoute>} />
+      <Route path="/student/ngos" element={<ProtectedRoute><RoleRoute roles={['student']}><StudentSuspense><NGODirectoryPage /></StudentSuspense></RoleRoute></ProtectedRoute>} />
+      <Route path="/student/applications" element={<ProtectedRoute><RoleRoute roles={['student']}><StudentSuspense><MyApplicationsPage /></StudentSuspense></RoleRoute></ProtectedRoute>} />
+      <Route path="/student/saved" element={<ProtectedRoute><RoleRoute roles={['student']}><StudentSuspense><SavedCoursesPage /></StudentSuspense></RoleRoute></ProtectedRoute>} />
+      <Route path="/student/interviews" element={<ProtectedRoute><RoleRoute roles={['student']}><StudentSuspense><StudentInterviewsPage /></StudentSuspense></RoleRoute></ProtectedRoute>} />
+      <Route path="/student/training" element={<ProtectedRoute><RoleRoute roles={['student']}><StudentSuspense><StudentTrainingPage /></StudentSuspense></RoleRoute></ProtectedRoute>} />
+      <Route path="/student/certificates" element={<ProtectedRoute><RoleRoute roles={['student']}><StudentSuspense><StudentCertificatesPage /></StudentSuspense></RoleRoute></ProtectedRoute>} />
+      <Route path="/student/messages" element={<ProtectedRoute><RoleRoute roles={['student']}><StudentSuspense><StudentMessagesPage /></StudentSuspense></RoleRoute></ProtectedRoute>} />
+      <Route path="/student/notifications" element={<ProtectedRoute><RoleRoute roles={['student']}><StudentSuspense><StudentNotificationsPage /></StudentSuspense></RoleRoute></ProtectedRoute>} />
+      <Route path="/student/profile" element={<ProtectedRoute><RoleRoute roles={['student']}><StudentSuspense><StudentProfilePage /></StudentSuspense></RoleRoute></ProtectedRoute>} />
+      <Route path="/student/settings" element={<ProtectedRoute><RoleRoute roles={['student']}><StudentSuspense><StudentSettingsPage /></StudentSuspense></RoleRoute></ProtectedRoute>} />
 
       {/* NGO Routes — Full Dashboard for Approved NGOs */}
       <Route path="/ngo/dashboard" element={
