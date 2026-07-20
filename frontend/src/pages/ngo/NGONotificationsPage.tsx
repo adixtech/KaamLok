@@ -1,173 +1,112 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
-  Bell, AlertCircle,  Calendar, FileText, Users,
-  MessageSquare,  Check, Trash2,  ChevronDown, Clock,
+  Bell, AlertCircle, Calendar, FileText, Users,
+  MessageSquare, Check, Trash2, ChevronDown, Clock,
 } from 'lucide-react';
 import { NGOLayout } from '../../components/ngo/NGOLayout';
 import { FullScreenLoader } from '../../components/ui/Loading';
+import { ngoApi } from '../../services/ngoApi';
+import type { NGONotification } from '../../types/ngo';
 import toast from 'react-hot-toast';
 
 type NotificationType = 'application' | 'interview' | 'course' | 'document' | 'system';
-type NotificationPriority = 'low' | 'medium' | 'high';
+type NotificationFilters = { type: NotificationType | 'all'; read: 'all' | 'read' | 'unread' };
 
-interface Notification {
-  _id: string;
-  type: NotificationType;
-  title: string;
-  message: string;
-  priority: NotificationPriority;
-  read: boolean;
-  createdAt: string;
-  actionUrl?: string;
-  metadata?: Record<string, unknown>;
+// Map backend notification types to UI categories
+function categorizeType(type: string): NotificationType {
+  if (type.includes('application')) return 'application';
+  if (type.includes('interview')) return 'interview';
+  if (type.includes('course')) return 'course';
+  if (type.includes('document') || type.includes('ngo_')) return 'document';
+  return 'system';
 }
-
-interface NotificationFilters {
-  type: NotificationType | 'all';
-  read: 'all' | 'read' | 'unread';
-}
-
-// Mock data for now - will be replaced with API when backend implements notification model
-const MOCK_NOTIFICATIONS: Notification[] = [
-  {
-    _id: '1',
-    type: 'application',
-    title: 'New Application Received',
-    message: 'Amit Kumar applied for Data Entry Operator course',
-    priority: 'medium',
-    read: false,
-    createdAt: new Date(Date.now() - 1000 * 60 * 5).toISOString(),
-    actionUrl: '/ngo/applications',
-    metadata: { applicationId: 'app123' },
-  },
-  {
-    _id: '2',
-    type: 'interview',
-    title: 'Interview Tomorrow',
-    message: 'Interview with Priya Sharma for Healthcare Assistant is scheduled for tomorrow at 10:00 AM',
-    priority: 'high',
-    read: false,
-    createdAt: new Date(Date.now() - 1000 * 60 * 60 * 2).toISOString(),
-    actionUrl: '/ngo/interviews',
-    metadata: { interviewId: 'int123' },
-  },
-  {
-    _id: '3',
-    type: 'course',
-    title: 'Course Closing Soon',
-    message: 'Web Development course applications close in 3 days. 5 seats remaining.',
-    priority: 'high',
-    read: false,
-    createdAt: new Date(Date.now() - 1000 * 60 * 60 * 4).toISOString(),
-    actionUrl: '/ngo/courses',
-    metadata: { courseId: 'course123' },
-  },
-  {
-    _id: '4',
-    type: 'document',
-    title: 'Document Verified',
-    message: 'Your registration certificate has been verified by admin',
-    priority: 'low',
-    read: true,
-    createdAt: new Date(Date.now() - 1000 * 60 * 60 * 24).toISOString(),
-  },
-  {
-    _id: '5',
-    type: 'application',
-    title: 'Application Withdrawn',
-    message: 'Rahul Verma withdrew their application for Electrician course',
-    priority: 'low',
-    read: true,
-    createdAt: new Date(Date.now() - 1000 * 60 * 60 * 48).toISOString(),
-  },
-  {
-    _id: '6',
-    type: 'system',
-    title: 'Weekly Report Ready',
-    message: 'Your weekly analytics report is ready for download',
-    priority: 'low',
-    read: true,
-    createdAt: new Date(Date.now() - 1000 * 60 * 60 * 72).toISOString(),
-    actionUrl: '/ngo/analytics',
-  },
-  {
-    _id: '7',
-    type: 'document',
-    title: 'Document Expiring Soon',
-    message: 'Your 80G certificate expires in 30 days. Please renew it.',
-    priority: 'medium',
-    read: false,
-    createdAt: new Date(Date.now() - 1000 * 60 * 60 * 5).toISOString(),
-    actionUrl: '/ngo/documents',
-  },
-  {
-    _id: '8',
-    type: 'interview',
-    title: 'Interview Completed',
-    message: 'Interview with Vikash Singh completed. Add feedback now.',
-    priority: 'medium',
-    read: false,
-    createdAt: new Date(Date.now() - 1000 * 60 * 30).toISOString(),
-    actionUrl: '/ngo/interviews',
-  },
-];
 
 export function NGONotificationsPage() {
-  const [notifications, setNotifications] = useState<Notification[]>([]);
+  const navigate = useNavigate();
+  const [notifications, setNotifications] = useState<NGONotification[]>([]);
   const [loading, setLoading] = useState(true);
-  const [filters, setFilters] = useState<NotificationFilters>({
-    type: 'all',
-    read: 'all',
-  });
+  const [error, setError] = useState<string | null>(null);
+  const [filters, setFilters] = useState<NotificationFilters>({ type: 'all', read: 'all' });
 
-  useEffect(() => {
-    // Simulate API call
-    setTimeout(() => {
-      setNotifications(MOCK_NOTIFICATIONS);
+  const fetchNotifications = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await ngoApi.getNotifications({ limit: 100 });
+      setNotifications(res.notifications);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load notifications');
+    } finally {
       setLoading(false);
-    }, 500);
+    }
   }, []);
 
+  useEffect(() => {
+    fetchNotifications();
+  }, [fetchNotifications]);
+
   const filteredNotifications = notifications.filter((n) => {
-    if (filters.type !== 'all' && n.type !== filters.type) return false;
-    if (filters.read === 'read' && !n.read) return false;
-    if (filters.read === 'unread' && n.read) return false;
+    if (filters.type !== 'all' && categorizeType(n.type) !== filters.type) return false;
+    if (filters.read === 'read' && !n.isRead) return false;
+    if (filters.read === 'unread' && n.isRead) return false;
     return true;
   });
 
-  const unreadCount = notifications.filter((n) => !n.read).length;
+  const unreadCount = notifications.filter((n) => !n.isRead).length;
 
-  const markAsRead = (id: string) => {
-    setNotifications((prev) =>
-      prev.map((n) => (n._id === id ? { ...n, read: true } : n))
-    );
-    toast.success('Marked as read');
+  const markAsRead = async (id: string) => {
+    try {
+      await ngoApi.markNotificationRead(id);
+      setNotifications((prev) => prev.map((n) => (n._id === id ? { ...n, isRead: true } : n)));
+      toast.success('Marked as read');
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to mark as read');
+    }
   };
 
-  const markAllAsRead = () => {
-    setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
-    toast.success('All notifications marked as read');
+  const markAllAsRead = async () => {
+    try {
+      await ngoApi.markAllNotificationsRead();
+      setNotifications((prev) => prev.map((n) => ({ ...n, isRead: true })));
+      toast.success('All notifications marked as read');
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to mark all as read');
+    }
   };
 
-  const deleteNotification = (id: string) => {
-    setNotifications((prev) => prev.filter((n) => n._id !== id));
-    toast.success('Notification deleted');
-  };
-
-  const clearAllRead = () => {
-    setNotifications((prev) => prev.filter((n) => !n.read));
-    toast.success('Cleared all read notifications');
+  const deleteNotification = async (id: string) => {
+    try {
+      await ngoApi.deleteNotification(id);
+      setNotifications((prev) => prev.filter((n) => n._id !== id));
+      toast.success('Notification deleted');
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to delete notification');
+    }
   };
 
   const stats = {
     total: notifications.length,
-    unread: unreadCount,
-    application: notifications.filter((n) => n.type === 'application').length,
-    interview: notifications.filter((n) => n.type === 'interview').length,
-    course: notifications.filter((n) => n.type === 'course').length,
-    document: notifications.filter((n) => n.type === 'document').length,
-    system: notifications.filter((n) => n.type === 'system').length,
+    application: notifications.filter((n) => categorizeType(n.type) === 'application').length,
+    interview: notifications.filter((n) => categorizeType(n.type) === 'interview').length,
+    course: notifications.filter((n) => categorizeType(n.type) === 'course').length,
+    document: notifications.filter((n) => categorizeType(n.type) === 'document').length,
+    system: notifications.filter((n) => categorizeType(n.type) === 'system').length,
   };
+
+  if (error) {
+    return (
+      <NGOLayout>
+        <div className="flex flex-col items-center justify-center py-20">
+          <AlertCircle className="h-12 w-12 text-rose-500" />
+          <p className="mt-4 text-lg font-semibold text-ink-900">{error}</p>
+          <button onClick={fetchNotifications} className="mt-4 rounded-xl bg-teal-600 px-4 py-2 text-sm font-semibold text-white hover:bg-teal-700">
+            Retry
+          </button>
+        </div>
+      </NGOLayout>
+    );
+  }
 
   return (
     <NGOLayout>
@@ -193,92 +132,17 @@ export function NGONotificationsPage() {
               Mark All Read
             </button>
           )}
-          {notifications.some((n) => n.read) && (
-            <button
-              onClick={clearAllRead}
-              className="inline-flex items-center gap-1.5 rounded-xl border border-ink-200 bg-white px-4 py-2 text-sm font-medium text-ink-700 transition-colors hover:bg-ink-50"
-            >
-              <Trash2 className="h-4 w-4" />
-              Clear Read
-            </button>
-          )}
         </div>
       </div>
 
       {/* Quick Stats */}
       <div className="mb-6 grid gap-3 sm:grid-cols-6">
-        <button
-          onClick={() => setFilters((f) => ({ ...f, type: 'all' }))}
-          className={`flex items-center gap-2 rounded-xl p-3 text-left transition-colors ${
-            filters.type === 'all' ? 'bg-teal-50 ring-2 ring-teal-500' : 'bg-white hover:bg-ink-50'
-          } shadow-card ring-1 ring-inset ring-ink-200/50`}
-        >
-          <Bell className="h-4 w-4 text-ink-500" />
-          <div>
-            <p className="text-lg font-bold text-ink-900">{stats.total}</p>
-            <p className="text-xs text-ink-500">All</p>
-          </div>
-        </button>
-        <button
-          onClick={() => setFilters((f) => ({ ...f, type: 'application' }))}
-          className={`flex items-center gap-2 rounded-xl p-3 text-left transition-colors ${
-            filters.type === 'application' ? 'bg-teal-50 ring-2 ring-teal-500' : 'bg-white hover:bg-ink-50'
-          } shadow-card ring-1 ring-inset ring-ink-200/50`}
-        >
-          <Users className="h-4 w-4 text-brand-500" />
-          <div>
-            <p className="text-lg font-bold text-ink-900">{stats.application}</p>
-            <p className="text-xs text-ink-500">Applications</p>
-          </div>
-        </button>
-        <button
-          onClick={() => setFilters((f) => ({ ...f, type: 'interview' }))}
-          className={`flex items-center gap-2 rounded-xl p-3 text-left transition-colors ${
-            filters.type === 'interview' ? 'bg-teal-50 ring-2 ring-teal-500' : 'bg-white hover:bg-ink-50'
-          } shadow-card ring-1 ring-inset ring-ink-200/50`}
-        >
-          <Calendar className="h-4 w-4 text-teal-500" />
-          <div>
-            <p className="text-lg font-bold text-ink-900">{stats.interview}</p>
-            <p className="text-xs text-ink-500">Interviews</p>
-          </div>
-        </button>
-        <button
-          onClick={() => setFilters((f) => ({ ...f, type: 'course' }))}
-          className={`flex items-center gap-2 rounded-xl p-3 text-left transition-colors ${
-            filters.type === 'course' ? 'bg-teal-50 ring-2 ring-teal-500' : 'bg-white hover:bg-ink-50'
-          } shadow-card ring-1 ring-inset ring-ink-200/50`}
-        >
-          <MessageSquare className="h-4 w-4 text-amber-500" />
-          <div>
-            <p className="text-lg font-bold text-ink-900">{stats.course}</p>
-            <p className="text-xs text-ink-500">Courses</p>
-          </div>
-        </button>
-        <button
-          onClick={() => setFilters((f) => ({ ...f, type: 'document' }))}
-          className={`flex items-center gap-2 rounded-xl p-3 text-left transition-colors ${
-            filters.type === 'document' ? 'bg-teal-50 ring-2 ring-teal-500' : 'bg-white hover:bg-ink-50'
-          } shadow-card ring-1 ring-inset ring-ink-200/50`}
-        >
-          <FileText className="h-4 w-4 text-emerald-500" />
-          <div>
-            <p className="text-lg font-bold text-ink-900">{stats.document}</p>
-            <p className="text-xs text-ink-500">Documents</p>
-          </div>
-        </button>
-        <button
-          onClick={() => setFilters((f) => ({ ...f, type: 'system' }))}
-          className={`flex items-center gap-2 rounded-xl p-3 text-left transition-colors ${
-            filters.type === 'system' ? 'bg-teal-50 ring-2 ring-teal-500' : 'bg-white hover:bg-ink-50'
-          } shadow-card ring-1 ring-inset ring-ink-200/50`}
-        >
-          <AlertCircle className="h-4 w-4 text-ink-500" />
-          <div>
-            <p className="text-lg font-bold text-ink-900">{stats.system}</p>
-            <p className="text-xs text-ink-500">System</p>
-          </div>
-        </button>
+        <FilterStatButton icon={<Bell className="h-4 w-4 text-ink-500" />} label="All" value={stats.total} active={filters.type === 'all'} onClick={() => setFilters((f) => ({ ...f, type: 'all' }))} />
+        <FilterStatButton icon={<Users className="h-4 w-4 text-brand-500" />} label="Applications" value={stats.application} active={filters.type === 'application'} onClick={() => setFilters((f) => ({ ...f, type: 'application' }))} />
+        <FilterStatButton icon={<Calendar className="h-4 w-4 text-teal-500" />} label="Interviews" value={stats.interview} active={filters.type === 'interview'} onClick={() => setFilters((f) => ({ ...f, type: 'interview' }))} />
+        <FilterStatButton icon={<MessageSquare className="h-4 w-4 text-amber-500" />} label="Courses" value={stats.course} active={filters.type === 'course'} onClick={() => setFilters((f) => ({ ...f, type: 'course' }))} />
+        <FilterStatButton icon={<FileText className="h-4 w-4 text-emerald-500" />} label="Documents" value={stats.document} active={filters.type === 'document'} onClick={() => setFilters((f) => ({ ...f, type: 'document' }))} />
+        <FilterStatButton icon={<AlertCircle className="h-4 w-4 text-ink-500" />} label="System" value={stats.system} active={filters.type === 'system'} onClick={() => setFilters((f) => ({ ...f, type: 'system' }))} />
       </div>
 
       {/* Read Status Filter */}
@@ -315,6 +179,7 @@ export function NGONotificationsPage() {
               notification={notification}
               onMarkRead={() => markAsRead(notification._id)}
               onDelete={() => deleteNotification(notification._id)}
+              onNavigate={notification.actionUrl ? () => navigate(notification.actionUrl!) : undefined}
             />
           ))}
         </div>
@@ -323,15 +188,28 @@ export function NGONotificationsPage() {
   );
 }
 
+function FilterStatButton({
+  icon, label, value, active, onClick,
+}: { icon: React.ReactNode; label: string; value: number; active: boolean; onClick: () => void }) {
+  return (
+    <button
+      onClick={onClick}
+      className={`flex items-center gap-2 rounded-xl p-3 text-left transition-colors ${
+        active ? 'bg-teal-50 ring-2 ring-teal-500' : 'bg-white hover:bg-ink-50'
+      } shadow-card ring-1 ring-inset ring-ink-200/50`}
+    >
+      {icon}
+      <div>
+        <p className="text-lg font-bold text-ink-900">{value}</p>
+        <p className="text-xs text-ink-500">{label}</p>
+      </div>
+    </button>
+  );
+}
+
 function FilterDropdown({
-  value,
-  onChange,
-  options,
-}: {
-  value: string;
-  onChange: (v: string) => void;
-  options: { value: string; label: string }[];
-}) {
+  value, onChange, options,
+}: { value: string; onChange: (v: string) => void; options: { value: string; label: string }[] }) {
   return (
     <div className="relative">
       <select
@@ -340,9 +218,7 @@ function FilterDropdown({
         className="appearance-none rounded-xl border border-ink-200 bg-white py-2.5 pl-4 pr-10 text-sm font-medium text-ink-700 focus:border-teal-500 focus:outline-none focus:ring-1 focus:ring-teal-500"
       >
         {options.map((opt) => (
-          <option key={opt.value} value={opt.value}>
-            {opt.label}
-          </option>
+          <option key={opt.value} value={opt.value}>{opt.label}</option>
         ))}
       </select>
       <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-400" />
@@ -351,14 +227,14 @@ function FilterDropdown({
 }
 
 function NotificationCard({
-  notification,
-  onMarkRead,
-  onDelete,
+  notification, onMarkRead, onDelete, onNavigate,
 }: {
-  notification: Notification;
+  notification: NGONotification;
   onMarkRead: () => void;
   onDelete: () => void;
+  onNavigate?: () => void;
 }) {
+  const category = categorizeType(notification.type);
   const typeConfig = {
     application: { icon: <Users className="h-5 w-5" />, color: 'text-brand-600', bg: 'bg-brand-50' },
     interview: { icon: <Calendar className="h-5 w-5" />, color: 'text-teal-600', bg: 'bg-teal-50' },
@@ -366,22 +242,13 @@ function NotificationCard({
     document: { icon: <FileText className="h-5 w-5" />, color: 'text-emerald-600', bg: 'bg-emerald-50' },
     system: { icon: <AlertCircle className="h-5 w-5" />, color: 'text-ink-600', bg: 'bg-ink-100' },
   };
-
-  const priorityConfig = {
-    high: 'border-l-rose-500',
-    medium: 'border-l-amber-500',
-    low: 'border-l-ink-200',
-  };
-
-  const config = typeConfig[notification.type];
+  const config = typeConfig[category];
   const timeAgo = getTimeAgo(notification.createdAt);
 
   return (
     <div
       className={`group flex gap-4 rounded-2xl bg-white p-4 shadow-card ring-1 ring-inset ring-ink-200/50 transition-all ${
-        !notification.read ? 'border-l-4' : ''
-      } ${!notification.read ? priorityConfig[notification.priority] : ''} ${
-        !notification.read ? 'bg-teal-50/30' : ''
+        !notification.isRead ? 'bg-teal-50/30' : ''
       }`}
     >
       <span className={`grid h-10 w-10 shrink-0 place-items-center rounded-xl ${config.bg} ${config.color}`}>
@@ -391,14 +258,12 @@ function NotificationCard({
       <div className="min-w-0 flex-1">
         <div className="flex items-start justify-between gap-2">
           <div>
-            <p className={`font-semibold text-ink-900 ${!notification.read ? 'text-ink-900' : 'text-ink-700'}`}>
+            <p className={`font-semibold ${notification.isRead ? 'text-ink-700' : 'text-ink-900'}`}>
               {notification.title}
             </p>
             <p className="mt-1 text-sm text-ink-600">{notification.message}</p>
           </div>
-          {!notification.read && (
-            <span className="mt-1 h-2 w-2 shrink-0 rounded-full bg-teal-500" />
-          )}
+          {!notification.isRead && <span className="mt-1 h-2 w-2 shrink-0 rounded-full bg-teal-500" />}
         </div>
 
         <div className="mt-3 flex items-center justify-between">
@@ -408,15 +273,15 @@ function NotificationCard({
           </div>
 
           <div className="flex items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100">
-            {notification.actionUrl && (
-              <a
-                href={notification.actionUrl}
+            {onNavigate && (
+              <button
+                onClick={onNavigate}
                 className="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-medium text-teal-600 hover:bg-teal-50"
               >
                 View
-              </a>
+              </button>
             )}
-            {!notification.read && (
+            {!notification.isRead && (
               <button
                 onClick={onMarkRead}
                 className="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-medium text-ink-600 hover:bg-ink-50"

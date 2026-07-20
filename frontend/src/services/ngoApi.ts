@@ -10,6 +10,7 @@ import type {
   ApplicationStatus,
   CourseStatus,
   DocumentType,
+  NGONotification,
 } from '../types/ngo';
 
 /**
@@ -26,6 +27,7 @@ export const ngoApi = {
     return data;
   },
 
+  
   // ─── Courses ─────────────────────────────────────────────────────────
   async listCourses(params?: {
     page?: number;
@@ -214,6 +216,33 @@ export const ngoApi = {
     return data;
   },
 
+    // ─── Notifications ──────────────────────────────────────────────────
+  async getNotifications(params?: {
+    page?: number;
+    limit?: number;
+  }): Promise<{
+    notifications: NGONotification[];
+    pagination: Pagination;
+    unreadCount: number;
+  }> {
+    const { data } = await apiClient.get(`${BASE}/notifications`, { params });
+    return data;
+  },
+
+  async markNotificationRead(id: string): Promise<{ message: string }> {
+    const { data } = await apiClient.put(`${BASE}/notifications/${id}/read`);
+    return data;
+  },
+
+  async markAllNotificationsRead(): Promise<{ message: string }> {
+    const { data } = await apiClient.put(`${BASE}/notifications/read-all`);
+    return data;
+  },
+
+  async deleteNotification(id: string): Promise<{ message: string }> {
+    const { data } = await apiClient.delete(`${BASE}/notifications/${id}`);
+    return data;
+  },
   // ─── Public Routes ─────────────────────────────────────────────────────
   async getPublicCourses(params?: {
     page?: number;

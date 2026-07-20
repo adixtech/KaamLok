@@ -1,8 +1,8 @@
-import { useEffect, useState, useCallback, type ReactNode } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import {
   BarChart3, TrendingUp, Users, CheckCircle2, XCircle, BookOpen,
-  Download, ChevronDown, Target,
-  PieChart, ArrowUpRight, ArrowDownRight,
+  Download,  ChevronDown, Target,
+  PieChart,
 } from 'lucide-react';
 import { NGOLayout } from '../../components/ngo/NGOLayout';
 import { ngoApi } from '../../services/ngoApi';
@@ -63,28 +63,8 @@ export function NGOAnalyticsPage() {
       URL.revokeObjectURL(link.href);
 
       toast.success('Analytics exported to CSV');
-    } catch {
+    } catch (err) {
       toast.error('Failed to export');
-    } finally {
-      setExporting(false);
-    }
-  };
-
-  const exportToExcel = async () => {
-    setExporting(true);
-    try {
-      await new Promise((resolve) => setTimeout(resolve, 500));
-      toast.success('Excel export feature - coming soon with backend integration');
-    } finally {
-      setExporting(false);
-    }
-  };
-
-  const exportToPDF = async () => {
-    setExporting(true);
-    try {
-      await new Promise((resolve) => setTimeout(resolve, 500));
-      toast.success('PDF export feature - coming soon with backend integration');
     } finally {
       setExporting(false);
     }
@@ -125,36 +105,7 @@ export function NGOAnalyticsPage() {
         </div>
         <div className="flex flex-wrap gap-2">
           <PeriodSelect value={period} onChange={(v) => setPeriod(v as Period)} />
-          <div className="group relative">
-            <button
-              disabled={exporting}
-              className="inline-flex items-center gap-2 rounded-xl border border-ink-200 bg-white px-4 py-2 text-sm font-medium text-ink-700 transition-colors hover:bg-ink-50 disabled:opacity-50"
-            >
-              <Download className="h-4 w-4" />
-              Export
-              <ChevronDown className="h-4 w-4" />
-            </button>
-            <div className="absolute right-0 mt-2 w-48 origin-top-right rounded-xl bg-white shadow-float ring-1 ring-ink-200 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all">
-              <button
-                onClick={exportToCSV}
-                className="block w-full px-4 py-2 text-left text-sm text-ink-700 hover:bg-ink-50"
-              >
-                Export as CSV
-              </button>
-              <button
-                onClick={exportToExcel}
-                className="block w-full px-4 py-2 text-left text-sm text-ink-700 hover:bg-ink-50"
-              >
-                Export as Excel (Coming Soon)
-              </button>
-              <button
-                onClick={exportToPDF}
-                className="block w-full px-4 py-2 text-left text-sm text-ink-700 hover:bg-ink-50"
-              >
-                Export as PDF (Coming Soon)
-              </button>
-            </div>
-          </div>
+          <ExportMenu exporting={exporting} onExport={exportToCSV} />
         </div>
       </div>
 
@@ -164,27 +115,24 @@ export function NGOAnalyticsPage() {
           icon={<Users className="h-5 w-5" />}
           label="Total Applications"
           value={totalApplications}
-          trend={12}
           tone="bg-brand-50 text-brand-600"
         />
         <MetricCard
           icon={<CheckCircle2 className="h-5 w-5" />}
           label="Selection Rate"
           value={`${selectionRate}%`}
-          trend={5}
           tone="bg-teal-50 text-teal-600"
         />
         <MetricCard
           icon={<Target className="h-5 w-5" />}
           label="Seats Filled"
           value={`${fillRate}%`}
-          trend={8}
           tone="bg-emerald-50 text-emerald-600"
         />
         <MetricCard
           icon={<BookOpen className="h-5 w-5" />}
           label="Active Courses"
-          value={courses.length}
+          value={analytics.courseStats.length}
           tone="bg-amber-50 text-amber-600"
         />
       </div>
@@ -228,12 +176,12 @@ export function NGOAnalyticsPage() {
               <ApplicationsChart data={analytics.applicationsGrowth} />
             )}
             {activeChart === 'courses' && (
-              <CourseBarChart data={analytics.courseStats} />
+              <CourseBarChart data={analytics.courseStats} courses={courses} />
             )}
             {activeChart === 'status' && (
               <StatusChart data={analytics.statusDistribution} />
             )}
-            {activeChart === 'seats' && <SeatsChart data={analytics.courseStats} />}
+            {activeChart === 'seats' && <SeatsChart data={analytics.courseStats} courses={courses} />}
           </div>
         </div>
 
@@ -275,19 +223,23 @@ export function NGOAnalyticsPage() {
               {analytics.courseStats
                 .sort((a, b) => b.count - a.count)
                 .slice(0, 5)
-                .map((course, idx) => (
-                  <div key={course._id} className="flex items-center gap-3">
-                    <span className="grid h-8 w-8 place-items-center rounded-lg bg-ink-100 text-xs font-bold text-ink-600">
-                      {idx + 1}
-                    </span>
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm font-medium text-ink-900">{course._id}</p>
-                      <p className="text-xs text-ink-500">
-                        {course.count} applications · {course.filled}/{course.totalSeats} seats
-                      </p>
+                .map((course, idx) => {
+                  const courseDoc = courses.find((c) => c._id === course._id);
+                  const title = courseDoc?.title || courseDoc?.slug || course._id;
+                  return (
+                    <div key={course._id} className="flex items-center gap-3">
+                      <span className="grid h-8 w-8 place-items-center rounded-lg bg-ink-100 text-xs font-bold text-ink-600">
+                        {idx + 1}
+                      </span>
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-sm font-medium text-ink-900">{title}</p>
+                        <p className="text-xs text-ink-500">
+                          {course.count} applications · {course.filled}/{course.totalSeats} seats
+                        </p>
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               {analytics.courseStats.length === 0 && (
                 <p className="py-4 text-center text-sm text-ink-400">No courses yet</p>
               )}
@@ -339,33 +291,51 @@ function PeriodSelect({
   );
 }
 
+function ExportMenu({ exporting, onExport }: { exporting: boolean; onExport: () => void }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="relative">
+      <button
+        disabled={exporting}
+        onClick={() => setOpen((o) => !o)}
+        className="inline-flex items-center gap-2 rounded-xl border border-ink-200 bg-white px-4 py-2 text-sm font-medium text-ink-700 transition-colors hover:bg-ink-50 disabled:opacity-50"
+      >
+        <Download className="h-4 w-4" />
+        Export
+        <ChevronDown className="h-4 w-4" />
+      </button>
+      {open && (
+        <>
+          <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
+          <div className="absolute right-0 z-20 mt-2 w-48 origin-top-right rounded-xl bg-white shadow-float ring-1 ring-ink-200">
+            <button
+              onClick={() => { onExport(); setOpen(false); }}
+              className="block w-full px-4 py-2 text-left text-sm text-ink-700 hover:bg-ink-50"
+            >
+              Export as CSV
+            </button>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
 function MetricCard({
   icon,
   label,
   value,
-  trend,
   tone,
 }: {
-  icon: ReactNode;
+  icon: React.ReactNode;
   label: string;
   value: string | number;
-  trend?: number;
   tone: string;
 }) {
   return (
     <div className="rounded-2xl bg-white p-5 shadow-card ring-1 ring-inset ring-ink-200/50">
       <div className="flex items-center justify-between">
         <span className={`grid h-10 w-10 place-items-center rounded-xl ${tone}`}>{icon}</span>
-        {trend !== undefined && (
-          <span
-            className={`inline-flex items-center gap-1 text-xs font-semibold ${
-              trend >= 0 ? 'text-emerald-600' : 'text-rose-600'
-            }`}
-          >
-            {trend >= 0 ? <ArrowUpRight className="h-3.5 w-3.5" /> : <ArrowDownRight className="h-3.5 w-3.5" />}
-            {Math.abs(trend)}%
-          </span>
-        )}
       </div>
       <div className="mt-3">
         <p className="text-2xl font-extrabold text-ink-900">{value}</p>
@@ -412,7 +382,7 @@ function ApplicationsChart({
   );
 }
 
-function CourseBarChart({ data }: { data: { _id: string; count: number; totalSeats: number; filled: number }[] }) {
+function CourseBarChart({ data, courses }: { data: { _id: string; count: number; totalSeats: number; filled: number }[]; courses: Course[] }) {
   if (data.length === 0) {
     return (
       <div className="flex h-48 items-center justify-center text-sm text-ink-400">
@@ -427,9 +397,11 @@ function CourseBarChart({ data }: { data: { _id: string; count: number; totalSea
     <div className="space-y-3">
       {data.slice(0, 6).map((course, i) => {
         const width = (course.count / maxCount) * 100;
+        const courseDoc = courses.find((c) => c._id === course._id);
+        const label = courseDoc?.title || course._id;
         return (
           <div key={i} className="flex items-center gap-3">
-            <span className="w-24 truncate text-xs font-medium text-ink-700">{course._id}</span>
+            <span className="w-24 truncate text-xs font-medium text-ink-700">{label}</span>
             <div className="min-w-0 flex-1">
               <div className="h-6 overflow-hidden rounded-lg bg-ink-100">
                 <div
@@ -494,7 +466,7 @@ function StatusChart({ data }: { data: { _id: string; count: number }[] }) {
   );
 }
 
-function SeatsChart({ data }: { data: { _id: string; totalSeats: number; filled: number; count: number }[] }) {
+function SeatsChart({ data, courses }: { data: { _id: string; totalSeats: number; filled: number; count: number }[]; courses: Course[] }) {
   if (data.length === 0) {
     return (
       <div className="flex h-48 items-center justify-center text-sm text-ink-400">
@@ -507,9 +479,11 @@ function SeatsChart({ data }: { data: { _id: string; totalSeats: number; filled:
     <div className="space-y-3">
       {data.slice(0, 6).map((course, i) => {
         const fillRate = course.totalSeats > 0 ? (course.filled / course.totalSeats) * 100 : 0;
+        const courseDoc = courses.find((c) => c._id === course._id);
+        const label = courseDoc?.title || course._id;
         return (
           <div key={i} className="flex items-center gap-3">
-            <span className="w-24 truncate text-xs font-medium text-ink-700">{course._id}</span>
+            <span className="w-24 truncate text-xs font-medium text-ink-700">{label}</span>
             <div className="min-w-0 flex-1">
               <div className="flex h-6 overflow-hidden rounded-lg bg-ink-100">
                 <div

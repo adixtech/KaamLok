@@ -121,10 +121,21 @@ export const ngoService = {
       Course.countDocuments({ ngoId, status: 'draft' }),
     ]);
 
-    const [applicationsReceived, pendingReview, shortlisted, selected, rejected, waitlisted] = await Promise.all([
+    const [
+      applicationsReceived,
+      pendingReview,
+      underReview,
+      shortlisted,
+      interviewScheduled,
+      selected,
+      rejected,
+      waitlisted,
+    ] = await Promise.all([
       Application.countDocuments({ ngoId }),
       Application.countDocuments({ ngoId, status: 'pending' }),
-      Application.countDocuments({ ngoId, status: { $in: ['shortlisted', 'under_review'] } }),
+      Application.countDocuments({ ngoId, status: 'under_review' }),
+      Application.countDocuments({ ngoId, status: 'shortlisted' }),
+      Application.countDocuments({ ngoId, status: 'interview_scheduled' }),
       Application.countDocuments({ ngoId, status: 'selected' }),
       Application.countDocuments({ ngoId, status: 'rejected' }),
       Application.countDocuments({ ngoId, status: 'waitlisted' }),
@@ -166,7 +177,9 @@ export const ngoService = {
       applications: {
         received: applicationsReceived,
         pending: pendingReview,
+        underReview,
         shortlisted,
+        interviewScheduled,
         selected,
         rejected,
         waitlisted,
@@ -511,6 +524,73 @@ export const ngoService = {
     };
   },
 
+  async getStudentProfile(applicationId: string, ngoId: string) {
+    // NGO can view a student's full profile only if they have an application
+    // with this NGO. This prevents unauthorized profile access.
+    const app = await Application.findOne({ _id: applicationId, ngoId });
+    if (!app) throw new ApiError(404, 'Application not found', 'APPLICATION_NOT_FOUND');
+
+    const [user, profile] = await Promise.all([
+      User.findById(app.studentId).select(
+        'firstName lastName email phone role status createdAt'
+      ),
+      StudentProfile.findOne({ user: app.studentId }),
+    ]);
+
+    if (!user) throw new ApiError(404, 'Student not found', 'NOT_FOUND');
+
+    return {
+      user: {
+        _id: user._id.toString(),
+        firstName: user.firstName,
+        lastName: user.lastName,
+        email: user.email,
+        phone: user.phone,
+        role: user.role,
+        status: user.status,
+        createdAt: user.createdAt.toISOString(),
+      },
+      profile: profile
+        ? {
+            _id: profile._id.toString(),
+            education: profile.education,
+            city: profile.city,
+            state: profile.state,
+            skills: profile.skills,
+            dateOfBirth: profile.dateOfBirth?.toISOString(),
+            gender: profile.gender,
+            phone: profile.phone,
+            alternativePhone: profile.alternativePhone,
+            address: profile.address,
+            pin: profile.pin,
+            photo: profile.photo,
+            bio: profile.bio,
+            educationDetails: profile.educationDetails,
+            experience: profile.experience,
+            languages: profile.languages,
+            emergencyContact: profile.emergencyContact,
+            resume: profile.resume,
+            portfolio: profile.portfolio,
+            socialLinks: profile.socialLinks,
+            profileCompletionScore: profile.profileCompletionScore,
+          }
+        : null,
+      application: {
+        _id: app._id.toString(),
+        status: app.status,
+        message: app.message,
+        documents: app.documents,
+        resume: app.resume,
+        createdAt: app.createdAt.toISOString(),
+        statusHistory: app.statusHistory.map((h) => ({
+          status: h.status,
+          changedAt: h.changedAt.toISOString(),
+          note: h.note,
+        })),
+      },
+    };
+  },
+
   async updateApplicationStatus(
     applicationId: string,
     ngoId: string,
@@ -529,23 +609,37 @@ export const ngoService = {
 
     await app.save();
 
-    // If selected, update course seat count
-    if (status === 'selected' && previousStatus !== 'selected') {
+    // Seat management: handle transitions to/from 'selected'
+    const wasSelected = previousStatus === 'selected';
+    const isSelected = status === 'selected';
+
+    if (isSelected && !wasSelected) {
+      // Moving TO selected — reserve a seat
       const course = await Course.findById(app.courseId);
       if (course) {
-        course.filledSeats += 1;
-        await course.save();
-
-        // Check if course is now full
-        if (course.filledSeats >= course.totalSeats) {
-          if (!course.waitingListEnabled) {
-            course.status = 'closed';
-            await course.save();
-          }
+        if (course.filledSeats < course.totalSeats) {
+          course.filledSeats += 1;
         }
-
-        // Update NGO stats
+        // Auto-close course when full and waitlist disabled
+        if (course.filledSeats >= course.totalSeats && !course.waitingListEnabled) {
+          course.status = 'closed';
+        }
+        await course.save();
         await NGOProfile.updateOne({ user: ngoId }, { $inc: { studentsSelected: 1 } });
+      }
+    } else if (wasSelected && !isSelected) {
+      // Moving AWAY from selected — release the seat
+      const course = await Course.findById(app.courseId);
+      if (course) {
+        if (course.filledSeats > 0) {
+          course.filledSeats -= 1;
+        }
+        // Reopen course if it was auto-closed due to full seats
+        if (course.status === 'closed' && course.filledSeats < course.totalSeats) {
+          course.status = 'published';
+        }
+        await course.save();
+        await NGOProfile.updateOne({ user: ngoId }, { $inc: { studentsSelected: -1 } });
       }
     }
 
@@ -624,17 +718,18 @@ export const ngoService = {
     const { page = 1, limit = 20, status = 'upcoming', courseId } = params;
     const skip = (page - 1) * limit;
 
+    // Query by interview existence, NOT application status.
+    // Completed interviews have status 'selected'/'rejected', so filtering by
+    // status:'interview_scheduled' would hide them.
     const query: Record<string, unknown> = {
       ngoId,
-      status: 'interview_scheduled',
-      'interview.scheduledAt': { $exists: true },
+      'interview.scheduledAt': { $exists: true, $ne: null },
     };
 
     if (courseId) query.courseId = courseId;
 
     if (status === 'upcoming') {
       query['interview.completed'] = { $ne: true };
-      query['interview.scheduledAt'] = { $gte: new Date() };
     } else if (status === 'completed') {
       query['interview.completed'] = true;
     }
@@ -664,13 +759,17 @@ export const ngoService = {
     const app = await Application.findOne({ _id: applicationId, ngoId });
     if (!app) throw new ApiError(404, 'Application not found', 'APPLICATION_NOT_FOUND');
 
-    app.interview = {
-      ...app.interview!,
-      completed: true,
-      feedback: data.feedback,
-    };
+    if (!app.interview || !app.interview.scheduledAt) {
+      throw new ApiError(400, 'No interview scheduled for this application', 'NO_INTERVIEW');
+    }
 
-    // Update status based on outcome
+    // Persist interview completion BEFORE updating status.
+    // updateApplicationStatus does a fresh findOne, so we must save first.
+    app.interview.completed = true;
+    app.interview.feedback = data.feedback;
+    await app.save();
+
+    // Update status based on outcome (handles seat sync internally)
     return this.updateApplicationStatus(applicationId, ngoId, data.outcome, data.feedback, changedBy);
   },
 
@@ -902,5 +1001,53 @@ export const ngoService = {
       .sort((a, b) => b.count - a.count);
 
     return { categories, skills, states };
+  },
+
+  // ─── Notifications ────────────────────────────────────────────────
+  async getNotifications(ngoId: string, params: { page?: number; limit?: number }) {
+    const { page = 1, limit = 20 } = params;
+    const skip = (page - 1) * limit;
+    const query = { recipientId: ngoId };
+
+    const [notifications, total, unread] = await Promise.all([
+      Notification.find(query).sort({ createdAt: -1 }).skip(skip).limit(limit),
+      Notification.countDocuments(query),
+      Notification.countDocuments({ ...query, isRead: false }),
+    ]);
+
+    return {
+      notifications: notifications.map((n) => ({
+        _id: n._id.toString(),
+        type: n.type,
+        title: n.title,
+        message: n.message,
+        isRead: n.isRead,
+        read: n.isRead,
+        link: n.link,
+        actionUrl: n.link,
+        createdAt: n.createdAt.toISOString(),
+        metadata: n.metadata,
+      })),
+      pagination: { page, limit, total, pages: Math.ceil(total / limit) },
+      unreadCount: unread,
+    };
+  },
+
+  async markNotificationRead(ngoId: string, notificationId: string) {
+    await Notification.findOneAndUpdate(
+      { _id: notificationId, recipientId: ngoId },
+      { isRead: true }
+    );
+    return { message: 'Notification marked as read' };
+  },
+
+  async markAllNotificationsRead(ngoId: string) {
+    await Notification.updateMany({ recipientId: ngoId, isRead: false }, { isRead: true });
+    return { message: 'All notifications marked as read' };
+  },
+
+  async deleteNotification(ngoId: string, notificationId: string) {
+    await Notification.deleteOne({ _id: notificationId, recipientId: ngoId });
+    return { message: 'Notification deleted' };
   },
 };

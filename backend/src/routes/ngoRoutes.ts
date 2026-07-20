@@ -32,6 +32,7 @@ router.delete('/courses/:id', ctrl.deleteCourse);
 // ─── Applications ────────────────────────────────────────────────
 router.get('/applications', ctrl.listApplications);
 router.get('/applications/:id', ctrl.getApplication);
+router.get('/applications/:id/student', ctrl.getStudentProfile);
 router.post('/applications/:id/review', ctrl.startReviewApplication);
 router.post('/applications/:id/shortlist', ctrl.shortlistApplication);
 router.post('/applications/:id/reject', ctrl.rejectApplication);
@@ -51,5 +52,11 @@ router.delete('/documents/:id', ctrl.deleteDocument);
 
 // ─── Analytics ───────────────────────────────────────────────────
 router.get('/analytics', ctrl.getAnalytics);
+
+// ─── Notifications ──────────────────────────────────────────────
+router.get('/notifications', ctrl.getNotifications);
+router.put('/notifications/:id/read', ctrl.markNotificationRead);
+router.put('/notifications/read-all', ctrl.markAllNotificationsRead);
+router.delete('/notifications/:id', ctrl.deleteNotification);
 
 export default router;

@@ -99,10 +99,8 @@ export interface NGOCourseContact {
   alternativePhone?: string;
   officeHours?: string;
 }
-//diffrence between type and interface
-//type for defining a union or intersection of types, while interface is for defining the shape of an object. Interfaces can be extended and implemented, while types cannot. Interfaces are generally preferred for defining object shapes, while types are used for more complex type definitions.
-//flexible for complex data nd follow rule types for unino and interface for object shapes.
-export interface Course  {
+
+export interface Course {
   _id: string;
   title: string;
   slug: string;
@@ -155,7 +153,7 @@ export type ApplicationStatus =
   | 'withdrawn';
 
 export type InterviewMode = 'online' | 'offline' | 'phone';
-export type InterviewStatus = 'scheduled' | 'completed' | 'cancelled';
+
 export interface Interview {
   scheduledAt?: string;
   mode?: InterviewMode;
@@ -178,6 +176,68 @@ export interface StudentProfile {
   city: string;
   state: string;
   skills: string[];
+}
+
+export interface EducationDetail {
+  qualification?: string;
+  institution?: string;
+  board?: string;
+  year?: string;
+  percentage?: string;
+}
+
+export interface ExperienceDetail {
+  title?: string;
+  organization?: string;
+  duration?: string;
+  description?: string;
+}
+
+export interface FullStudentProfile {
+  _id: string;
+  education?: string;
+  city?: string;
+  state?: string;
+  skills?: string[];
+  dateOfBirth?: string;
+  gender?: string;
+  phone?: string;
+  alternativePhone?: string;
+  address?: string;
+  pin?: string;
+  photo?: string;
+  bio?: string;
+  educationDetails?: EducationDetail[];
+  experience?: ExperienceDetail[];
+  languages?: string[];
+  emergencyContact?: { name?: string; phone?: string; relation?: string };
+  resume?: string;
+  portfolio?: string;
+  socialLinks?: { linkedin?: string; github?: string; website?: string };
+  profileCompletionScore?: number;
+}
+
+export interface StudentProfileDetail {
+  user: {
+    _id: string;
+    firstName: string;
+    lastName: string;
+    email: string;
+    phone?: string;
+    role: string;
+    status: string;
+    createdAt: string;
+  };
+  profile: FullStudentProfile | null;
+  application: {
+    _id: string;
+    status: ApplicationStatus;
+    message?: string;
+    documents: string[];
+    resume?: string;
+    createdAt: string;
+    statusHistory: { status: ApplicationStatus; changedAt: string; note?: string }[];
+  };
 }
 
 export interface Application {
@@ -277,7 +337,9 @@ export interface NGODashboardStats {
   applications: {
     received: number;
     pending: number;
+    underReview: number;
     shortlisted: number;
+    interviewScheduled: number;
     selected: number;
     rejected: number;
     waitlisted: number;
@@ -299,6 +361,19 @@ export interface NGODashboardStats {
 }
 
 // ─── Analytics Types ─────────────────────────────────────────────────
+export interface NGONotification {
+  _id: string;
+  type: string;
+  title: string;
+  message: string;
+  isRead: boolean;
+  read: boolean;
+  link?: string;
+  actionUrl?: string;
+  createdAt: string;
+  metadata?: Record<string, unknown>;
+}
+
 export interface NGOAnalytics {
   period: string;
   applicationsGrowth: { _id: Record<string, number>; count: number }[];

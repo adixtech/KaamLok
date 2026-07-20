@@ -92,7 +92,7 @@ export function NGODashboardPage() {
       {/* Applications Overview */}
       <div className="mb-8">
         <h2 className="mb-3 text-sm font-bold uppercase tracking-wider text-ink-400">Applications</h2>
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-6">
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <NGOStatCard
             icon={<Briefcase className="h-5 w-5" />}
             label="Total Received"
@@ -106,10 +106,22 @@ export function NGODashboardPage() {
             tone="bg-amber-50 text-amber-600"
           />
           <NGOStatCard
+            icon={<Clock className="h-5 w-5" />}
+            label="Under Review"
+            value={stats.applications.underReview}
+            tone="bg-brand-50 text-brand-600"
+          />
+          <NGOStatCard
             icon={<Users className="h-5 w-5" />}
             label="Shortlisted"
             value={stats.applications.shortlisted}
             tone="bg-teal-50 text-teal-600"
+          />
+          <NGOStatCard
+            icon={<Calendar className="h-5 w-5" />}
+            label="Interview Scheduled"
+            value={stats.applications.interviewScheduled}
+            tone="bg-purple-50 text-purple-600"
           />
           <NGOStatCard
             icon={<CheckCircle2 className="h-5 w-5" />}

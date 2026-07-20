@@ -1,6 +1,8 @@
 import type { RequestHandler } from 'express';
 import { ngoService } from '../services/ngoService';
 import { ApiError } from '../utils/errors';
+import type { ApplicationStatus } from '../models/Application';
+import type { CourseStatus } from '../models/Course';
 
 /**
  * NGO Controller - HTTP layer for NGO dashboard routes
@@ -45,7 +47,7 @@ export const listCourses: RequestHandler = async (req, res, next) => {
       page: Number(req.query.page) || 1,
       limit: Number(req.query.limit) || 20,
       search: req.query.search as string,
-      status: req.query.status as undefined,
+      status: req.query.status as CourseStatus | undefined,
       category: req.query.category as string,
       sortBy: req.query.sortBy as string,
       sortOrder: req.query.sortOrder as 'asc' | 'desc',
@@ -143,7 +145,7 @@ export const listApplications: RequestHandler = async (req, res, next) => {
     const result = await ngoService.listApplications(req.user.id, {
       page: Number(req.query.page) || 1,
       limit: Number(req.query.limit) || 20,
-      status: req.query.status as undefined,
+      status: req.query.status as ApplicationStatus | undefined,
       courseId: req.query.courseId as string,
       search: req.query.search as string,
       sortBy: req.query.sortBy as string,
@@ -234,6 +236,16 @@ export const startReviewApplication: RequestHandler = async (req, res, next) => 
       req.body.note,
       req.user.id
     );
+    res.json(result);
+  } catch (err) {
+    next(err);
+  }
+};
+
+export const getStudentProfile: RequestHandler = async (req, res, next) => {
+  try {
+    if (!req.user) throw new ApiError(401, 'Authentication required', 'UNAUTHORIZED');
+    const result = await ngoService.getStudentProfile(req.params.id, req.user.id);
     res.json(result);
   } catch (err) {
     next(err);
@@ -348,6 +360,50 @@ export const getAnalytics: RequestHandler = async (req, res, next) => {
       req.user.id,
       req.query.period as string
     );
+    res.json(result);
+  } catch (err) {
+    next(err);
+  }
+};
+
+// ─── Notifications ──────────────────────────────────────────────
+export const getNotifications: RequestHandler = async (req, res, next) => {
+  try {
+    if (!req.user) throw new ApiError(401, 'Authentication required', 'UNAUTHORIZED');
+    const result = await ngoService.getNotifications(req.user.id, {
+      page: Number(req.query.page) || 1,
+      limit: Number(req.query.limit) || 20,
+    });
+    res.json(result);
+  } catch (err) {
+    next(err);
+  }
+};
+
+export const markNotificationRead: RequestHandler = async (req, res, next) => {
+  try {
+    if (!req.user) throw new ApiError(401, 'Authentication required', 'UNAUTHORIZED');
+    const result = await ngoService.markNotificationRead(req.user.id, req.params.id);
+    res.json(result);
+  } catch (err) {
+    next(err);
+  }
+};
+
+export const markAllNotificationsRead: RequestHandler = async (req, res, next) => {
+  try {
+    if (!req.user) throw new ApiError(401, 'Authentication required', 'UNAUTHORIZED');
+    const result = await ngoService.markAllNotificationsRead(req.user.id);
+    res.json(result);
+  } catch (err) {
+    next(err);
+  }
+};
+
+export const deleteNotification: RequestHandler = async (req, res, next) => {
+  try {
+    if (!req.user) throw new ApiError(401, 'Authentication required', 'UNAUTHORIZED');
+    const result = await ngoService.deleteNotification(req.user.id, req.params.id);
     res.json(result);
   } catch (err) {
     next(err);
