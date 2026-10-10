@@ -39,6 +39,9 @@ router.post('/applications/:id/reject', ctrl.rejectApplication);
 router.post('/applications/:id/select', ctrl.selectApplication);
 router.post('/applications/:id/waitlist', ctrl.waitlistApplication);
 
+// ─── Messages ──────────────────────────────────────────────────
+router.post('/messages', ctrl.sendStudentMessage);
+
 // ─── Interviews ──────────────────────────────────────────────────
 router.get('/interviews', ctrl.getInterviews);
 router.post('/interviews/:id/schedule', ctrl.scheduleInterview);
@@ -58,5 +61,15 @@ router.get('/notifications', ctrl.getNotifications);
 router.put('/notifications/:id/read', ctrl.markNotificationRead);
 router.put('/notifications/read-all', ctrl.markAllNotificationsRead);
 router.delete('/notifications/:id', ctrl.deleteNotification);
+
+// Settings
+router.get('/settings', ctrl.getSettings);
+router.put('/settings/notifications', ctrl.updateNotificationSettings);
+router.put('/settings/preferences', ctrl.updatePreferences);
+
+// Success Stories
+router.get('/success-stories/pending', ctrl.getPendingSuccessStories);
+router.patch('/success-stories/:id/approve', ctrl.approveSuccessStory);
+router.delete('/success-stories/:id/reject', ctrl.rejectSuccessStory);
 
 export default router;

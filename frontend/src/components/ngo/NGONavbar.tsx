@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Menu, Search, Bell, LogOut, ChevronDown, Building2 } from 'lucide-react';
-import { useAuth } from '../../context/AuthContext';
+import { useAuth } from '../../context/useAuth';
 import { ngoApi } from '../../services/ngoApi';
 import type { NGOProfile } from '../../types/ngo';
 

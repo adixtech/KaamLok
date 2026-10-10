@@ -1,15 +1,20 @@
 import mongoose from 'mongoose';
 import { config } from './config/env';
 import { createApp } from './app';
+import { assertEmailConfigured } from './services/emailTransport';
 
 /**
  * Server entry point.
- * Connects to MongoDB, then starts the Express server.
+ * Connects to MongoDB, verifies email delivery is configured, then starts Express.
  */
 async function start() {
   try {
     await mongoose.connect(config.mongoUri);
     console.log('[KaamLok] Connected to MongoDB');
+
+    // Report mail delivery status before accepting traffic so a misconfigured
+    // mail setup is visible at boot rather than at the first login.
+    await assertEmailConfigured();
 
     const app = createApp();
     const server = app.listen(config.port, () => {

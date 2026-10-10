@@ -79,6 +79,22 @@ export const publicApi = {
     return data;
   },
 
+  async getVerifiedNGOs(params?: {
+    page?: number;
+    limit?: number;
+    search?: string;
+    state?: string;
+    sector?: string;
+  }): Promise<{ ngos: FeaturedNGO[]; pagination: Pagination }> {
+    const { data } = await apiClient.get(`${PUBLIC}/ngos/verified`, { params });
+    return data;
+  },
+
+  async getVerifiedNGOCount(): Promise<{ total: number; states: string[]; sectors: string[] }> {
+    const { data } = await apiClient.get(`${PUBLIC}/ngos/verified/count`);
+    return data;
+  },
+
   // ─── Contact ───────────────────────────────────────────────────────
   async submitContact(payload: {
     name: string;

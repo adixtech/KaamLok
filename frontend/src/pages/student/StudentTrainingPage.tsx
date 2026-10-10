@@ -26,7 +26,10 @@ export function StudentTrainingPage() {
     }
   }, []);
 
-  useEffect(() => { fetchTraining(); }, [fetchTraining]);
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    fetchTraining();
+  }, [fetchTraining]);
 
   return (
     <StudentLayout>

@@ -16,13 +16,13 @@ import { BENEFIT_LABELS } from '../../types/ngo';
 
 type Props = {
   course: PublicCourse;
-  index?: number;
 };
 
 const PLACEHOLDER_THUMBNAIL = 'https://images.pexels.com/photos/207692/pexels-photo-207692.jpeg?auto=compress&cs=tinysrgb&w=800';
 
 function getDaysLeft(deadline: string): number {
-  return Math.ceil((new Date(deadline).getTime() - Date.now()) / (1000 * 60 * 60 * 24));
+  const now = Date.now();
+  return Math.ceil((new Date(deadline).getTime() - now) / (1000 * 60 * 60 * 24));
 }
 
 function getLocation(c: PublicCourse): string {

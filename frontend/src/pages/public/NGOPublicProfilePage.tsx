@@ -6,6 +6,7 @@ import {
   MapPin,
   Mail,
   Phone,
+  Globe,
   Users,
   BookOpen,
   Calendar,
@@ -15,7 +16,6 @@ import {
   AlertCircle,
   ArrowRight,
 } from 'lucide-react';
-//remove Global,social media all icon name from import because ...
 import { Navbar } from '../../components/sections/Navbar';
 import { Footer } from '../../components/sections/Footer';
 import { Skeleton } from '../../components/ui/Loading';
@@ -24,7 +24,6 @@ import { publicApi } from '../../services/publicApi';
 import type { NGOPublicProfile, NGOPublicCourse } from '../../types/public';
 
 const COVER_PLACEHOLDER = 'https://images.pexels.com/photos/3184360/pexels-photo-3184360.jpeg?auto=compress&cs=tinysrgb&w=1200';
-const LOGO_PLACEHOLDER = 'https://images.pexels.com/photos/207692/pexels-photo-207692.jpeg?auto=compress&cs=tinysrgb&w=400';
 
 export function NGOPublicProfilePage() {
   const { slug } = useParams<{ slug: string }>();
@@ -32,6 +31,12 @@ export function NGOPublicProfilePage() {
   const [courses, setCourses] = useState<NGOPublicCourse[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [now, setNow] = useState(() => Date.now());
+
+  useEffect(() => {
+    const interval = setInterval(() => setNow(Date.now()), 60000);
+    return () => clearInterval(interval);
+  }, []);
 
   useEffect(() => {
     if (!slug) return;
@@ -110,7 +115,7 @@ export function NGOPublicProfilePage() {
             <div className="shrink-0">
               {profile.logo ? (
                 <img
-                  src={profile.logo || LOGO_PLACEHOLDER}
+                  src={profile.logo}
                   alt={profile.ngoName}
                   className="h-24 w-24 rounded-2xl object-cover ring-4 ring-white shadow-soft sm:h-28 sm:w-28"
                 />
@@ -167,6 +172,22 @@ export function NGOPublicProfilePage() {
             </div>
           </div>
 
+\\new add by me for update in dasboard for new user
+ {/* Verification callout */}
+          {isVerified && (
+            <div className="mt-6 flex items-center gap-4 rounded-3xl bg-teal-50 p-5 ring-1 ring-teal-200">
+              <span className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-teal-500 text-white shadow-soft">
+                <BadgeCheck className="h-6 w-6" />
+              </span>
+              <div>
+                <p className="text-sm font-bold text-teal-900">Verified by KaamLok</p>
+                <p className="text-xs text-teal-700">
+                  This organization has been reviewed and approved through KaamLok's NGO verification process.
+                </p>
+              </div>
+            </div>
+          )}
+
           {/* Content grid */}
           <div className="mt-8 grid gap-8 lg:grid-cols-3">
             {/* Main */}
@@ -220,7 +241,7 @@ export function NGOPublicProfilePage() {
                 ) : (
                   <div className="mt-6 grid gap-4 sm:grid-cols-2">
                     {courses.map((c) => {
-                      const daysLeft = Math.ceil((new Date(c.schedule.applicationEnd).getTime() - Date.now()) / (1000 * 60 * 60 * 24));
+                      const daysLeft = Math.ceil((new Date(c.schedule.applicationEnd).getTime() - now) / (1000 * 60 * 60 * 24));
                       const isFull = c.availableSeats <= 0;
                       return (
                         <Link
@@ -315,32 +336,63 @@ export function NGOPublicProfilePage() {
                   </section>
                 )}
 
-                {/* Social Links
-                {profile.socialLinks && Object.values(profile.socialLinks).some((v) => v) && (
-                  <section className="rounded-3xl bg-white p-6 shadow-card ring-1 ring-inset ring-ink-200/50">
-                    <h2 className="text-sm font-bold text-ink-900">Follow Us</h2>
-                    <div className="mt-3 flex flex-wrap gap-2">
-                      {profile.socialLinks.website && (
-                        <SocialLink href={profile.socialLinks.website} icon={Globe} label="Website" />
-                      )}
-                      {profile.socialLinks.linkedin && (
-                        <SocialLink href={profile.socialLinks.linkedin} icon={Linkedin} label="LinkedIn" />
-                      )}
-                      {profile.socialLinks.twitter && (
-                        <SocialLink href={profile.socialLinks.twitter} icon={Twitter} label="Twitter" />
-                      )}
-                      {profile.socialLinks.facebook && (
-                        <SocialLink href={profile.socialLinks.facebook} icon={Facebook} label="Facebook" />
-                      )}
-                      {profile.socialLinks.instagram && (
-                        <SocialLink href={profile.socialLinks.instagram} icon={Instagram} label="Instagram" />
-                      )}
-                      {profile.socialLinks.youtube && (
-                        <SocialLink href={profile.socialLinks.youtube} icon={Youtube} label="YouTube" />
-                      )}
-                    </div>
-                  </section>
-                )}  */}
+                {/* Social Links */}
+{profile.socialLinks &&
+  Object.values(profile.socialLinks).some((v) => v) && (
+    <section className="rounded-3xl bg-white p-6 shadow-card ring-1 ring-inset ring-ink-200/50">
+      <h2 className="text-sm font-bold text-ink-900">Follow Us</h2>
+
+      <div className="mt-3 flex flex-wrap gap-2">
+        {profile.socialLinks.website && (
+          <SocialLink
+            href={profile.socialLinks.website}
+            icon={Globe}
+            label="Website"
+          />
+        )}
+
+        {profile.socialLinks.linkedin && (
+          <SocialLink
+            href={profile.socialLinks.linkedin}
+            iconText="in"
+            label="LinkedIn"
+          />
+        )}
+
+        {profile.socialLinks.twitter && (
+          <SocialLink
+            href={profile.socialLinks.twitter}
+            iconText="𝕏"
+            label="X / Twitter"
+          />
+        )}
+
+        {profile.socialLinks.facebook && (
+          <SocialLink
+            href={profile.socialLinks.facebook}
+            iconText="f"
+            label="Facebook"
+          />
+        )}
+
+        {profile.socialLinks.instagram && (
+          <SocialLink
+            href={profile.socialLinks.instagram}
+            iconText="◎"
+            label="Instagram"
+          />
+        )}
+
+        {profile.socialLinks.youtube && (
+          <SocialLink
+            href={profile.socialLinks.youtube}
+            iconText="▶"
+            label="YouTube"
+          />
+        )}
+      </div>
+    </section>
+  )}
 
                 {/* CTA */}
                 <Link to="/programs">
@@ -364,16 +416,33 @@ export function NGOPublicProfilePage() {
   );
 }
 
-// function SocialLink({ href, icon: Icon, label }: { href: string; icon: typeof Globe; label: string }) {
-//   return (
-//     <a
-//       href={href}
-//       target="_blank"
-//       rel="noopener noreferrer"
-//       aria-label={label}
-//       className="grid h-10 w-10 place-items-center rounded-xl bg-ink-50 text-ink-500 ring-1 ring-ink-200 transition-all hover:-translate-y-0.5 hover:bg-brand-50 hover:text-brand-600 hover:ring-brand-200"
-//     >
-//       <Icon className="h-5 w-5" />
-//     </a>
-//   );
-// }
+function SocialLink({
+  href,
+  icon: Icon,
+  iconText,
+  label,
+}: {
+  href: string;
+  icon?: typeof Globe;
+  iconText?: string;
+  label: string;
+}) {
+  const url = href.startsWith('http') ? href : `https://${href}`;
+
+  return (
+    <a
+      href={url}
+      target="_blank"
+      rel="noopener noreferrer"
+      aria-label={label}
+      title={label}
+      className="grid h-10 w-10 place-items-center rounded-xl bg-ink-50 text-ink-500 ring-1 ring-ink-200 transition-all hover:-translate-y-0.5 hover:bg-brand-50 hover:text-brand-600 hover:ring-brand-200"
+    >
+      {Icon ? (
+        <Icon className="h-5 w-5" />
+      ) : (
+        <span className="text-sm font-bold">{iconText}</span>
+      )}
+    </a>
+  );
+}

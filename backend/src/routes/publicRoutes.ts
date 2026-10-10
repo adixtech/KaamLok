@@ -41,6 +41,8 @@ router.post('/newsletter/unsubscribe', publicCtrl.unsubscribeNewsletter);
 
 // ─── NGO Public Profile ─────────────────────────────────────────
 router.get('/ngos/featured', publicCtrl.getFeaturedNGOs);
+router.get('/ngos/verified', publicCtrl.getVerifiedNGOs);
+router.get('/ngos/verified/count', publicCtrl.getVerifiedNGOCount);
 router.get('/ngos/:slug', publicCtrl.getNGOProfileBySlug);
 
 // ─── Contact ─────────────────────────────────────────────────────

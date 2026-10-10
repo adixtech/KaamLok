@@ -1,12 +1,13 @@
 import { useCallback, useEffect, useState } from 'react';
 import toast from 'react-hot-toast';
 import {
-  Search, Plus, Pencil, Trash2, Star, Upload, Archive,
+  Search, Pencil, Trash2, Star, Upload, Archive,
 } from 'lucide-react';
 import { AdminLayout } from '../../components/admin/AdminLayout';
 import { AdminTable } from '../../components/admin/AdminTable';
 import { AdminPagination } from '../../components/admin/AdminPagination';
-import { AdminBadge, statusTone } from '../../components/admin/AdminBadge';
+import { AdminBadge } from '../../components/admin/AdminBadge';
+import { statusTone } from '../../utils/adminStatus';
 import { AdminButton } from '../../components/admin/AdminButton';
 import { AdminModal } from '../../components/admin/AdminModal';
 import { ErrorState } from '../../components/admin/AdminLoading';
@@ -46,11 +47,14 @@ export function CourseManagementPage() {
     }
   }, [page, search, status]);
 
-  useEffect(() => { fetchCourses(); }, [fetchCourses]);
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    fetchCourses();
+  }, [fetchCourses]);
 
   const applySearch = () => { setPage(1); fetchCourses(); };
 
-  const openCreate = () => { setEditCourse(null); setForm({ ...emptyForm }); setShowForm(true); };
+  //const openCreate = () => { setEditCourse(null); setForm({ ...emptyForm }); setShowForm(true); };
   const openEdit = (c: CourseItem) => { setEditCourse(c); setForm({ title: c.title, description: c.description, category: c.category, duration: c.duration, mode: c.mode, seats: c.seats }); setShowForm(true); };
 
   const submitForm = async () => {
@@ -119,7 +123,7 @@ export function CourseManagementPage() {
           <h1 className="text-2xl font-extrabold tracking-tight text-ink-900">Course Management</h1>
           <p className="mt-1 text-sm text-ink-500">Create and manage courses</p>
         </div>
-        <AdminButton icon={<Plus className="h-4 w-4" />} onClick={openCreate}>Add Course</AdminButton>
+        {/* <AdminButton icon={<Plus className="h-4 w-4" />} onClick={openCreate}>Add Cou</AdminButton> */}
       </div>
 
       {/* Filters */}

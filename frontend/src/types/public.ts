@@ -197,6 +197,7 @@ export interface FeaturedNGO {
   ngoName: string;
   slug?: string;
   logo?: string;
+  coverImage?: string;    ///added by bolt
   description: string;
   city?: string;
   state?: string;

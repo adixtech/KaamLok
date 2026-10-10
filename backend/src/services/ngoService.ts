@@ -4,8 +4,17 @@ import { NGOProfile, type INGOProfile } from '../models/NGOProfile';
 import { User } from '../models/User';
 import { StudentProfile } from '../models/StudentProfile';
 import { Notification } from '../models/Notification';
+import { SuccessStory } from '../models/SuccessStory';
 import { ApiError } from '../utils/errors';
+import { normalizeCourseLists } from '../utils/normalize';
+import { sendTransactionalEmail } from './emailService';
+import { config } from '../config/env';
 import type { Types } from 'mongoose';
+
+type NGOProfileWithSettings = INGOProfile & {
+  notificationSettings?: Record<string, boolean>;
+  preferences?: Record<string, string>;
+};
 
 /**
  * NGO Service - All business logic for NGO dashboard operations
@@ -114,9 +123,13 @@ function serializeApplication(app: IApplication, student?: unknown, course?: unk
 export const ngoService = {
   // ─── Dashboard Stats ──────────────────────────────────────────
   async getDashboardStats(ngoId: string) {
+    const now = new Date();
     const [totalCourses, activeCourses, closedCourses, draftCourses] = await Promise.all([
       Course.countDocuments({ ngoId, status: { $ne: 'archived' } }),
-      Course.countDocuments({ ngoId, status: 'published', isPublished: true }),
+      // A "live" course accepts applications, so an expired applicationEnd no
+      // longer counts toward active courses (previously expired courses were
+      // still shown as active).
+      Course.countDocuments({ ngoId, status: 'published', isPublished: true, 'schedule.applicationEnd': { $gte: now } }),
       Course.countDocuments({ ngoId, status: 'closed' }),
       Course.countDocuments({ ngoId, status: 'draft' }),
     ]);
@@ -162,7 +175,6 @@ export const ngoService = {
       .populate('courseId', 'title');
 
     // Upcoming deadlines
-    const now = new Date();
     const upcomingDeadlines = await Course.find({
       ngoId,
       status: 'published',
@@ -198,15 +210,17 @@ export const ngoService = {
   },
 
   // ─── Course Management ──────────────────────────────────────────
-  async createCourse(ngoId: string, data: Record<string, unknown>) {
+  async createCourse(ngoId: string, rawData: Record<string, unknown>) {
     const ngoProfile = await NGOProfile.findOne({ user: ngoId });
     const user = await User.findById(ngoId);
     if (!user) throw new ApiError(404, 'NGO not found', 'NGO_NOT_FOUND');
 
-    if (!data.title || typeof data.title !== 'string' || !data.title.trim()) {
+    if (!rawData.title || typeof rawData.title !== 'string' || !rawData.title.trim()) {
       throw new ApiError(400, 'Course title is required', 'VALIDATION_ERROR');
     }
 
+    // Comma-separated list fields arrive as strings from the course editor.
+    const data = normalizeCourseLists(rawData);
     const slug = await generateUniqueSlug(data.title as string);
 
     const now = new Date();
@@ -250,13 +264,15 @@ export const ngoService = {
     return { course: serializeCourse(course), message: 'Course created successfully' };
   },
 
-  async updateCourse(courseId: string, ngoId: string, data: Record<string, unknown>) {
+  async updateCourse(courseId: string, ngoId: string, rawData: Record<string, unknown>) {
     const course = await Course.findOne({ _id: courseId, ngoId });
     if (!course) throw new ApiError(404, 'Course not found', 'COURSE_NOT_FOUND');
 
-    if (course.isPublished && (data.schedule || data.totalSeats || data.eligibility)) {
+    if (course.isPublished && (rawData.schedule || rawData.totalSeats || rawData.eligibility)) {
       throw new ApiError(400, 'Cannot modify certain fields of a published course', 'COURSE_PUBLISHED');
     }
+
+    const data = normalizeCourseLists(rawData);
 
     if (data.title && data.title !== course.title) {
       course.slug = await generateUniqueSlug(data.title as string, courseId);
@@ -359,8 +375,13 @@ export const ngoService = {
     const course = await Course.findOne({ _id: courseId, ngoId });
     if (!course) throw new ApiError(404, 'Course not found', 'COURSE_NOT_FOUND');
 
+    const previousStatus = course.status;
     course.status = 'paused';
     await course.save();
+
+    if (previousStatus === 'published') {
+      await NGOProfile.updateOne({ user: ngoId }, { $inc: { activeCourses: -1 } });
+    }
 
     return { message: 'Course paused successfully' };
   },
@@ -369,8 +390,13 @@ export const ngoService = {
     const course = await Course.findOne({ _id: courseId, ngoId });
     if (!course) throw new ApiError(404, 'Course not found', 'COURSE_NOT_FOUND');
 
+    const previousStatus = course.status;
     course.status = 'published';
     await course.save();
+
+    if (previousStatus !== 'published') {
+      await NGOProfile.updateOne({ user: ngoId }, { $inc: { activeCourses: 1 } });
+    }
 
     return { message: 'Course resumed successfully' };
   },
@@ -379,8 +405,13 @@ export const ngoService = {
     const course = await Course.findOne({ _id: courseId, ngoId });
     if (!course) throw new ApiError(404, 'Course not found', 'COURSE_NOT_FOUND');
 
+    const previousStatus = course.status;
     course.status = 'closed';
     await course.save();
+
+    if (previousStatus === 'published') {
+      await NGOProfile.updateOne({ user: ngoId }, { $inc: { activeCourses: -1 } });
+    }
 
     return { message: 'Course closed successfully' };
   },
@@ -389,12 +420,16 @@ export const ngoService = {
     const course = await Course.findOne({ _id: courseId, ngoId });
     if (!course) throw new ApiError(404, 'Course not found', 'COURSE_NOT_FOUND');
 
+    const previousStatus = course.status;
     course.status = 'archived';
     course.isPublished = false;
     await course.save();
 
-    // Update NGO active courses
-    await NGOProfile.updateOne({ user: ngoId }, { $inc: { activeCourses: -1, totalCourses: -1 } });
+    const update: Record<string, number> = { totalCourses: -1 };
+    if (previousStatus === 'published') {
+      update.activeCourses = -1;
+    }
+    await NGOProfile.updateOne({ user: ngoId }, { $inc: update });
 
     return { message: 'Course archived successfully' };
   },
@@ -434,8 +469,11 @@ export const ngoService = {
     await Application.deleteMany({ courseId });
     await Course.deleteOne({ _id: courseId });
 
-    // Update NGO stats
-    await NGOProfile.updateOne({ user: ngoId }, { $inc: { totalCourses: -1 } });
+    const update: Record<string, number> = { totalCourses: -1 };
+    if (course.status === 'published') {
+      update.activeCourses = -1;
+    }
+    await NGOProfile.updateOne({ user: ngoId }, { $inc: update });
 
     return { message: 'Course deleted successfully' };
   },
@@ -530,11 +568,12 @@ export const ngoService = {
     const app = await Application.findOne({ _id: applicationId, ngoId });
     if (!app) throw new ApiError(404, 'Application not found', 'APPLICATION_NOT_FOUND');
 
-    const [user, profile] = await Promise.all([
+    const [user, profile, course] = await Promise.all([
       User.findById(app.studentId).select(
         'firstName lastName email phone role status createdAt'
       ),
       StudentProfile.findOne({ user: app.studentId }),
+      Course.findById(app.courseId).select('title slug category mode ngoName'),
     ]);
 
     if (!user) throw new ApiError(404, 'Student not found', 'NOT_FOUND');
@@ -588,6 +627,16 @@ export const ngoService = {
           note: h.note,
         })),
       },
+      course: course
+        ? {
+            _id: course._id.toString(),
+            title: course.title,
+            slug: course.slug,
+            category: course.category,
+            mode: course.mode,
+            ngoName: course.ngoName,
+          }
+        : null,
     };
   },
 
@@ -645,12 +694,25 @@ export const ngoService = {
 
     // Send notification to student
     const studentId = app.studentId;
+    const course = app.courseId as unknown as { title?: string };
+    const courseTitle = course?.title || 'your course';
+    const statusLabels: Record<string, string> = {
+      pending: 'Received',
+      under_review: 'Under Review',
+      shortlisted: 'Shortlisted',
+      interview_scheduled: 'Interview Scheduled',
+      selected: 'Selected',
+      rejected: 'Not Selected',
+      waitlisted: 'Waitlisted',
+      withdrawn: 'Withdrawn',
+    };
+    const statusLabel = statusLabels[status] || status;
     await Notification.create({
       recipientId: studentId,
       type: 'application_received',
       title: 'Application Status Updated',
-      message: `Your application status has been updated to: ${status}`,
-      link: `/student/applications/${applicationId}`,
+      message: `Your application for "${courseTitle}" has been updated to: ${statusLabel}`,
+      link: `/student/applications`,
     });
 
     return { message: 'Application status updated' };
@@ -670,6 +732,85 @@ export const ngoService = {
 
   async waitlistApplication(applicationId: string, ngoId: string, changedBy: string, note?: string) {
     return this.updateApplicationStatus(applicationId, ngoId, 'waitlisted', note, changedBy);
+  },
+
+  /**
+   * Deliver a message from an NGO to a student.
+   *
+   * Two channels, so the student is not dependent on either:
+   *   1. an in-app Notification (appears in the student's Messages/Notifications)
+   *   2. a real email via the configured transport (SMTP / SES / SNS)
+   *
+   * If `applicationId` is supplied the recipient must be an applicant to this
+   * NGO, which keeps an NGO from reaching arbitrary students.
+   */
+  async sendStudentMessage(
+    ngoId: string,
+    input: { recipientEmail: string; subject: string; body: string; applicationId?: string }
+  ) {
+    const email = input.recipientEmail.trim().toLowerCase();
+    const subject = input.subject.trim();
+    const body = input.body.trim();
+
+    if (!email) throw new ApiError(400, 'Recipient email is required', 'VALIDATION_ERROR', 'recipientEmail');
+    if (!subject) throw new ApiError(400, 'Subject is required', 'VALIDATION_ERROR', 'subject');
+    if (!body) throw new ApiError(400, 'Message body is required', 'VALIDATION_ERROR', 'body');
+
+    const student = await User.findOne({ email, role: 'student' });
+    if (!student) throw new ApiError(404, 'No student found with that email', 'RECIPIENT_NOT_FOUND');
+
+    let applicationId: string | undefined = input.applicationId;
+    if (applicationId) {
+      const owned = await Application.findOne({ _id: applicationId, ngoId, studentId: student._id })
+        .select('_id');
+      if (!owned) {
+        throw new ApiError(403, 'You can only message students who applied to your organization', 'FORBIDDEN');
+      }
+    } else {
+      // No explicit scope: only message students who applied to this NGO.
+      const related = await Application.findOne({ ngoId, studentId: student._id }).select('_id');
+      if (!related) {
+        throw new ApiError(403, 'You can only message students who applied to your organization', 'FORBIDDEN');
+      }
+      applicationId = related._id.toString();
+    }
+
+    const sender = await NGOProfile.findOne({ user: ngoId }).select('ngoName');
+    const senderName = sender?.ngoName || 'Your NGO';
+
+    const notification = await Notification.create({
+      recipientId: student._id,
+      type: 'system',
+      title: subject,
+      message: body,
+      link: applicationId ? `/student/applications` : '/student/messages',
+      metadata: { from: senderName, applicationId, channel: 'ngo_message' },
+    });
+
+    // Email is best-effort: the in-app message is already delivered, so a mail
+    // outage must not fail the request and lose the message entirely.
+    let emailed = false;
+    try {
+      await sendTransactionalEmail({
+        to: student.email,
+        subject: `${subject} — ${senderName}`,
+        heading: subject,
+        body: `${body}\n\n— ${senderName}`,
+        actionLabel: 'View on KaamLok',
+        actionUrl: `${config.clientOrigin}/student/messages`,
+      });
+      emailed = true;
+    } catch (err) {
+      console.error(`[ngo] In-app message saved but email to ${student.email} failed:`, (err as Error).message);
+    }
+
+    return {
+      message: emailed
+        ? 'Message delivered to the student'
+        : 'Message saved to the student inbox (email delivery unavailable)',
+      notificationId: notification._id.toString(),
+      emailed,
+    };
   },
 
   // ─── Interview Management ──────────────────────────────────────
@@ -1049,5 +1190,130 @@ export const ngoService = {
   async deleteNotification(ngoId: string, notificationId: string) {
     await Notification.deleteOne({ _id: notificationId, recipientId: ngoId });
     return { message: 'Notification deleted' };
+  },
+
+  // ─── Settings ──────────────────────────────────────────────────
+  async getSettings(ngoId: string) {
+    const profile = await NGOProfile.findOne({ user: ngoId });
+    if (!profile) throw new ApiError(404, 'NGO profile not found', 'NOT_FOUND');
+    return {
+      notificationSettings: (profile as NGOProfileWithSettings).notificationSettings || {
+        emailNotifications: true,
+        applicationAlerts: true,
+        interviewReminders: true,
+        courseUpdates: true,
+        marketingEmails: false,
+      },
+      preferences: (profile as NGOProfileWithSettings).preferences || {
+        language: 'en',
+        timezone: 'Asia/Kolkata',
+        dateFormat: 'DD/MM/YYYY',
+      },
+    };
+  },
+
+  // //async getSettings(ngoId: string) {
+  //   const profile = await NGOProfile.findOne({ user: ngoId });
+  //   if (!profile) throw new ApiError(404, 'NGO profile not found', 'NOT_FOUND');
+  //   return {
+  //     notificationSettings: profile.notificationSettings || {
+  //       emailNotifications: true,
+  //       applicationAlerts: true,
+  //       interviewReminders: true,
+  //       courseUpdates: true,
+  //       marketingEmails: false,
+  //     },
+  //     preferences: profile.preferences || {
+  //       language: 'en',
+  //       timezone: 'Asia/Kolkata',
+  //       dateFormat: 'DD/MM/YYYY',
+  //     },
+  //   };
+  // },
+
+  async updateNotificationSettings(ngoId: string, settings: Record<string, boolean>) {
+    const profile = await NGOProfile.findOneAndUpdate(
+      { user: ngoId },
+      { $set: { notificationSettings: settings } },
+      { new: true, upsert: true }
+    );
+    return { notificationSettings: (profile as NGOProfileWithSettings).notificationSettings };
+  },
+
+  //    return { notificationSettings: profile.notificationSettings };
+  // },
+
+  async updatePreferences(ngoId: string, preferences: Record<string, string>) {
+    const profile = await NGOProfile.findOneAndUpdate(
+      { user: ngoId },
+      { $set: { preferences } },
+      { new: true, upsert: true }
+    );
+    return { preferences: (profile as NGOProfileWithSettings).preferences };
+  },
+
+  //   return { preferences: profile.preferences };
+  // },
+
+  // ─── Success Stories ──────────────────────────────────────────
+  async getPendingSuccessStories(ngoId: string) {
+    const stories = await SuccessStory.find({
+      ngoId,
+      isPublished: false,
+    })
+      .sort({ createdAt: -1 })
+      .populate('courseId', 'title slug')
+      .lean();
+
+    return stories.map((s) => ({
+      _id: s._id.toString(),
+      studentName: s.studentName,
+      studentPhoto: s.studentPhoto,
+      courseTitle: s.courseTitle,
+      beforeStory: s.beforeStory,
+      afterStory: s.afterStory,
+      quote: s.quote,
+      skillsLearned: s.skillsLearned,
+      currentRole: s.currentRole,
+      currentCompany: s.currentCompany,
+      createdAt: s.createdAt.toISOString(),
+    }));
+  },
+
+  async approveSuccessStory(ngoId: string, storyId: string) {
+    const story = await SuccessStory.findOneAndUpdate(
+      { _id: storyId, ngoId },
+      { isPublished: true },
+      { new: true }
+    );
+    if (!story) throw new ApiError(404, 'Success story not found', 'NOT_FOUND');
+    return { message: 'Success story approved and published' };
+  },
+
+  async rejectSuccessStory(ngoId: string, storyId: string) {
+    const result = await SuccessStory.deleteOne({ _id: storyId, ngoId, isPublished: false });
+    if (result.deletedCount === 0) throw new ApiError(404, 'Story not found or already published', 'NOT_FOUND');
+    return { message: 'Success story rejected' };
+  },
+
+  async getPublishedSuccessStories(ngoId: string) {
+    const stories = await SuccessStory.find({ ngoId, isPublished: true })
+      .sort({ isFeatured: -1, createdAt: -1 })
+      .lean();
+    return stories.map((s) => ({
+      _id: s._id.toString(),
+      studentName: s.studentName,
+      studentPhoto: s.studentPhoto,
+      studentCity: s.studentCity,
+      courseTitle: s.courseTitle,
+      skillsLearned: s.skillsLearned,
+      currentRole: s.currentRole,
+      currentCompany: s.currentCompany,
+      quote: s.quote,
+      beforeStory: s.beforeStory,
+      afterStory: s.afterStory,
+      completionDate: s.completionDate?.toISOString(),
+      isFeatured: s.isFeatured,
+    }));
   },
 };

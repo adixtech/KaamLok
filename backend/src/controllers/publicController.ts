@@ -66,6 +66,31 @@ export const getFeaturedNGOs: RequestHandler = async (_req, res, next) => {
   }
 };
 
+// ─── Verified NGO Directory ────────────────────────────────────────
+export const getVerifiedNGOs: RequestHandler = async (req, res, next) => {
+  try {
+    const result = await publicService.getVerifiedNGOs({
+      page: Number(req.query.page) || 1,
+      limit: Number(req.query.limit) || 12,
+      search: req.query.search as string,
+      state: req.query.state as string,
+      sector: req.query.sector as string,
+    });
+    res.json(result);
+  } catch (err) {
+    next(err);
+  }
+};
+
+export const getVerifiedNGOCount: RequestHandler = async (_req, res, next) => {
+  try {
+    const result = await publicService.getVerifiedNGOCount();
+    res.json(result);
+  } catch (err) {
+    next(err);
+  }
+};
+
 // ─── Contact ─────────────────────────────────────────────────────
 export const submitContact: RequestHandler = async (req, res, next) => {
   try {

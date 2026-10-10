@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Menu, Search, Bell, LogOut, ChevronRight } from 'lucide-react';
-import { useAuth } from '../../context/AuthContext';
+import { useAuth } from '../../context/useAuth';
 import { adminApi } from '../../services/adminApi';
 import type { NotificationItem } from '../../types/admin';
 import { AdminBadge } from './AdminBadge';

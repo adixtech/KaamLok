@@ -6,7 +6,8 @@ import {
 import { AdminLayout } from '../../components/admin/AdminLayout';
 import { AdminTable } from '../../components/admin/AdminTable';
 import { AdminPagination } from '../../components/admin/AdminPagination';
-import { AdminBadge, statusTone } from '../../components/admin/AdminBadge';
+import { AdminBadge } from '../../components/admin/AdminBadge';
+import { statusTone } from '../../utils/adminStatus';
 import { AdminButton } from '../../components/admin/AdminButton';
 import { AdminModal } from '../../components/admin/AdminModal';
 import { ErrorState } from '../../components/admin/AdminLoading';
@@ -50,7 +51,10 @@ export function StudentManagementPage() {
     }
   }, [page, search, status, stateFilter, cityFilter]);
 
-  useEffect(() => { fetchStudents(); }, [fetchStudents]);
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    fetchStudents();
+  }, [fetchStudents]);
 
   const applySearch = () => { setPage(1); fetchStudents(); };
   const closeAction = () => { setAction(null); setReason(''); };

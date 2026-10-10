@@ -25,11 +25,19 @@ export function AnalyticsPage() {
   const [period, setPeriod] = useState<Period>('monthly');
 
   useEffect(() => {
-    setLoading(true);
-    adminApi.getAnalytics(period)
-      .then(setData)
-      .catch((err) => setError((err as Error)?.message || 'Failed to load analytics'))
-      .finally(() => setLoading(false));
+    let active = true;
+    (async () => {
+      setLoading(true);
+      try {
+        const result = await adminApi.getAnalytics(period);
+        if (active) setData(result);
+      } catch (err) {
+        if (active) setError((err as Error)?.message || 'Failed to load analytics');
+      } finally {
+        if (active) setLoading(false);
+      }
+    })();
+    return () => { active = false; };
   }, [period]);
 
   if (error) {

@@ -15,6 +15,22 @@ const required = (key: string, fallback?: string): string => {
   return value;
 };
 
+const EMAIL_PROVIDERS = ['smtp', 'ses', 'sns', 'console'] as const;
+type EmailProvider = (typeof EMAIL_PROVIDERS)[number];
+
+function resolveEmailProvider(): EmailProvider {
+  const raw = (process.env.EMAIL_PROVIDER || '').trim().toLowerCase();
+  if (EMAIL_PROVIDERS.includes(raw as EmailProvider)) return raw as EmailProvider;
+  if (raw) {
+    // Unknown provider is a typo, not a reason to silently fall back.
+    throw new Error(
+      `Invalid EMAIL_PROVIDER "${process.env.EMAIL_PROVIDER}". Expected one of: ${EMAIL_PROVIDERS.join(', ')}`
+    );
+  }
+  // Implicit default: real SMTP when credentials exist, console otherwise.
+  return process.env.SMTP_USER && process.env.SMTP_PASS ? 'smtp' : 'console';
+}
+
 export const config = {
   port: Number(process.env.PORT) || 5000,
   nodeEnv: process.env.NODE_ENV || 'development',
@@ -43,23 +59,45 @@ export const config = {
   },
 
   otp: {
-    length: 6,
-    expiryMs: 5 * 60 * 1000, // 5 minutes
+    length: Number(process.env.OTP_LENGTH) || 6,
+    // Overridable so login/OTP windows can be tuned per environment.
+    // Default raised from 5 to 10 minutes: a 5-minute OTP expired while a
+    // human was still reading the email, which made users think login was failing.
+    expiryMs: ((n: string | undefined) => ((n && Number(n) > 0 ? Number(n) : 10) * 60_000))(
+      process.env.OTP_EXPIRY_MINUTES,
+    ),
   },
 
   email: {
+    provider: resolveEmailProvider(),
     from: process.env.EMAIL_FROM || 'KaamLok <no-reply@kaamlok.in>',
-    host: process.env.SMTP_HOST || 'smtp.gmail.com',
-    port: Number(process.env.SMTP_PORT) || 587,
-    user: process.env.SMTP_USER || '',
-    pass: process.env.SMTP_PASS || '',
+    smtp: {
+      host: process.env.SMTP_HOST || 'smtp.gmail.com',
+      port: Number(process.env.SMTP_PORT) || 587,
+      user: process.env.SMTP_USER || '',
+      pass: process.env.SMTP_PASS || '',
+    },
+    aws: {
+      region: process.env.AWS_REGION || process.env.AWS_DEFAULT_REGION || '',
+      accessKeyId: process.env.AWS_ACCESS_KEY_ID || '',
+      secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY || '',
+      snsTopicArn: process.env.AWS_SNS_EMAIL_TOPIC_ARN || '',
+    },
   },
 
-  clientOrigin: process.env.CLIENT_ORIGIN || 'http://localhost:5174',
+  clientOrigin: process.env.CLIENT_ORIGIN || 'http://localhost:3000',
 
   rateLimit: {
-    windowMs: 15 * 60 * 1000, // 15 minutes
-    max: 100,
-    authMax: 10, // stricter for login/register/otp
+    windowMs: ((n: string | undefined) => (n && Number(n) > 0 ? Number(n) : 15 * 60_000))(
+      process.env.RATE_LIMIT_WINDOW_MS,
+    ),
+    max: ((n: string | undefined) => (n && Number(n) > 0 ? Number(n) : 100))(
+      process.env.RATE_LIMIT_MAX,
+    ),
+    // auth endpoints: high enough that a developer never locks themselves out
+    // during local testing, still bounded to stop credential-stuffing scripts.
+    authMax: ((n: string | undefined) => (n && Number(n) > 0 ? Number(n) : 50))(
+      process.env.RATE_LIMIT_AUTH_MAX,
+    ),
   },
 };

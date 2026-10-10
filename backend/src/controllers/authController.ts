@@ -106,3 +106,19 @@ export const resetPassword: RequestHandler = async (req, res, next) => {
     next(err);
   }
 };
+
+export const changePassword: RequestHandler = async (req, res, next) => {
+  try {
+    if (!req.user) throw new ApiError(401, 'Authentication required', 'UNAUTHORIZED');
+    const { currentPassword, newPassword } = req.body;
+    const result = await authService.changePassword(
+      req.user.id,
+      req.user.role,
+      currentPassword,
+      newPassword
+    );
+    res.status(200).json(result);
+  } catch (err) {
+    next(err);
+  }
+};

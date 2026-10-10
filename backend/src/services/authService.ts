@@ -190,7 +190,18 @@ export const authService = {
       consumed: false,
     });
 
-    await sendOTPEmail(email, code, purpose === 'password_reset' ? 'reset' : 'verification');
+    // A stored code the user never receives is a dead end: fail the request so
+    // the client can say so, rather than reporting a success that cannot complete.
+    try {
+      await sendOTPEmail(email, code, purpose === 'password_reset' ? 'reset' : 'verification');
+    } catch (err) {
+      console.error(`[auth] Failed to email ${purpose} OTP to ${email}:`, (err as Error).message);
+      throw new ApiError(
+        503,
+        'We could not send the verification email. Please try again in a moment.',
+        'EMAIL_DELIVERY_FAILED'
+      );
+    }
   },
 
   async verifyOTP(email: string, otp: string) {
@@ -315,5 +326,35 @@ export const authService = {
     user.password = password;
     await user.save();
     return { message: 'Password reset successfully' };
+  },
+
+  /**
+   * Change the password of the signed-in account. Requires the current
+   * password so a stolen session alone cannot lock the owner out.
+   */
+  async changePassword(userId: string, role: string | undefined, currentPassword: string, newPassword: string) {
+    if (!currentPassword) throw new ApiError(400, 'Current password is required', 'VALIDATION_ERROR', 'currentPassword');
+    if (!newPassword || newPassword.length < 8) {
+      throw new ApiError(400, 'New password must be at least 8 characters', 'VALIDATION_ERROR', 'newPassword');
+    }
+
+    if (role === 'admin') {
+      const admin = await Admin.findById(userId).select('+password');
+      if (!admin) throw new ApiError(404, 'Admin not found', 'USER_NOT_FOUND');
+      const ok = await admin.comparePassword(currentPassword);
+      if (!ok) throw new ApiError(401, 'Current password is incorrect', 'INVALID_CREDENTIALS', 'currentPassword');
+      admin.password = newPassword;
+      await admin.save();
+      return { message: 'Password changed successfully' };
+    }
+
+    const user = await User.findById(userId).select('+password');
+    if (!user) throw new ApiError(404, 'User not found', 'USER_NOT_FOUND');
+    const ok = await user.comparePassword(currentPassword);
+    if (!ok) throw new ApiError(401, 'Current password is incorrect', 'INVALID_CREDENTIALS', 'currentPassword');
+
+    user.password = newPassword;
+    await user.save();
+    return { message: 'Password changed successfully' };
   },
 };

@@ -20,7 +20,7 @@ import {
   Globe,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
-import { useAuth } from '../../context/AuthContext';
+import { useAuth } from '../../context/useAuth';
 import { publicApi } from '../../services/publicApi';
 import type { FullCourse, StudentApplication } from '../../types/public';
 import { Button } from '../../components/ui/Button';
@@ -51,6 +51,12 @@ export function CourseDetailsPage() {
   const [application, setApplication] = useState<StudentApplication | null>(null);
   const [applyMessage, setApplyMessage] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [now, setNow] = useState(() => Date.now());
+
+  useEffect(() => {
+    const interval = setInterval(() => setNow(Date.now()), 60000);
+    return () => clearInterval(interval);
+  }, []);
 
   useEffect(() => {
     if (!slug) return;
@@ -80,7 +86,6 @@ export function CourseDetailsPage() {
         if (active) setApplication(app);
       } catch {
         // Not applied yet — that's fine
-      } finally {
       }
     })();
     return () => { active = false; };
@@ -143,7 +148,7 @@ export function CourseDetailsPage() {
     );
   }
 
-  const daysLeft = Math.ceil((new Date(course.schedule.applicationEnd).getTime() - Date.now()) / (1000 * 60 * 60 * 24));
+  const daysLeft = Math.ceil((new Date(course.schedule.applicationEnd).getTime() - now) / (1000 * 60 * 60 * 24));
   const isFull = course.availableSeats <= 0;
   const isClosed = daysLeft < 0;
   const isVerified = course.ngoVerificationStatus === 'approved';

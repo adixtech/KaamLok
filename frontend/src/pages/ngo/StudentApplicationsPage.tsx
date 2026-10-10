@@ -83,6 +83,7 @@ export function StudentApplicationsPage() {
   }, [page, activeTab, search]);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchApplications();
   }, [fetchApplications]);
 
@@ -569,6 +570,7 @@ function ApplicationDetailModal({
 
       {showMessage && student && (
         <MessageStudentModal
+          applicationId={application._id}
           studentEmail={student.email}
           studentName={`${student.firstName} ${student.lastName}`}
           onClose={() => setShowMessage(false)}
@@ -593,41 +595,11 @@ function StudentProfileModal({
     let cancelled = false;
     (async () => {
       try {
-        const result = await ngoApi.getApplication(applicationId);
-        if (!cancelled) {
-          const app = result.application;
-
-          // Build a StudentProfileDetail-like object from Application
-          setData({
-            user:
-              typeof app.studentId === 'string'
-                ? {
-                    _id: app.studentId,
-                    firstName: '',
-                    lastName: '',
-                    email: '',
-                    role: '',
-                    status: '',
-                    createdAt: '',
-                  }
-                : {
-                    ...app.studentId,
-                    role: '',
-                    status: '',
-                    createdAt: '',
-                  },
-            profile: (app.studentProfile as unknown as StudentProfileDetail['profile']) ?? null,
-            application: {
-              _id: app._id,
-              status: app.status,
-              message: app.message,
-              documents: app.documents,
-              resume: app.resume,
-              createdAt: app.createdAt,
-              statusHistory: app.statusHistory,
-            },
-          });
-        }
+        // Dedicated endpoint: returns the account, the complete StudentProfile
+        // document, the application, and the course. Building this from the
+        // list payload lost fields (role/status/education/experience details).
+        const result = await ngoApi.getStudentProfile(applicationId);
+        if (!cancelled) setData(result);
       } catch (err) {
         if (!cancelled) setError(err instanceof Error ? err.message : 'Failed to load profile');
       } finally {
@@ -692,6 +664,21 @@ function StudentProfileModal({
               </div>
             )}
 
+            {/* Applied for */}
+            {data.course && (
+              <div className="mt-6 rounded-xl bg-ink-50 p-4">
+                <p className="text-xs font-bold uppercase text-ink-400">Applied For</p>
+                <p className="mt-1 font-semibold text-ink-900">{data.course.title}</p>
+                <div className="mt-1 flex flex-wrap gap-2 text-xs text-ink-500">
+                  {data.course.category && <span className="rounded-full bg-white px-2 py-0.5">{data.course.category}</span>}
+                  {data.course.mode && <span className="rounded-full bg-white px-2 py-0.5 capitalize">{data.course.mode}</span>}
+                  <span className="rounded-full bg-teal-50 px-2 py-0.5 font-medium text-teal-700">
+                    {STATUS_LABELS[data.application.status]}
+                  </span>
+                </div>
+              </div>
+            )}
+
             {/* Personal Details */}
             <div className="mt-6">
               <p className="text-xs font-bold uppercase text-ink-400">Personal Details</p>
@@ -718,15 +705,24 @@ function StudentProfileModal({
             </div>
 
             {/* Education */}
-            {data.profile?.educationDetails && data.profile.educationDetails.length > 0 && (
+            {(data.profile?.education || (data.profile?.educationDetails && data.profile.educationDetails.length > 0)) && (
               <div className="mt-6">
                 <p className="text-xs font-bold uppercase text-ink-400">Education</p>
+                {data.profile.education && (
+                  <p className="mt-1 text-sm text-ink-700">{data.profile.education}</p>
+                )}
                 <div className="mt-2 space-y-2">
-                  {data.profile.educationDetails.map((edu, i) => (
+                  {(data.profile?.educationDetails ?? []).map((edu, i) => (
                     <div key={i} className="rounded-xl border border-ink-200 p-3">
-                      <p className="font-medium text-ink-900">{edu.qualification || '-'}</p>
-                      <p className="text-sm text-ink-600">{edu.institution || ''} {edu.board ? `(${edu.board})` : ''}</p>
-                      <p className="text-xs text-ink-400">{edu.year || ''} {edu.percentage ? `• ${edu.percentage}%` : ''}</p>
+                      <p className="font-medium text-ink-900">{edu.degree || '-'}</p>
+                      <p className="text-sm text-ink-600">{edu.institution || ''}</p>
+                      {(edu.yearOfCompletion || edu.percentage != null) && (
+                        <p className="text-xs text-ink-400">
+                          {edu.yearOfCompletion ? `${edu.yearOfCompletion}` : ''}
+                          {edu.yearOfCompletion && edu.percentage != null ? ' • ' : ''}
+                          {edu.percentage != null ? `${edu.percentage}%` : ''}
+                        </p>
+                      )}
                     </div>
                   ))}
                 </div>
@@ -753,11 +749,31 @@ function StudentProfileModal({
                   {data.profile.experience.map((exp, i) => (
                     <div key={i} className="rounded-xl border border-ink-200 p-3">
                       <p className="font-medium text-ink-900">{exp.title || '-'}</p>
-                      <p className="text-sm text-ink-600">{exp.organization || ''}</p>
-                      <p className="text-xs text-ink-400">{exp.duration || ''}</p>
+                      <p className="text-sm text-ink-600">{exp.company || ''}</p>
+                      {(exp.startDate || exp.endDate || exp.current) && (
+                        <p className="text-xs text-ink-400">
+                          {exp.startDate || '?'} — {exp.current ? 'Present' : exp.endDate || '?'}
+                        </p>
+                      )}
                       {exp.description && <p className="mt-1 text-sm text-ink-600">{exp.description}</p>}
                     </div>
                   ))}
+                </div>
+              </div>
+            )}
+
+            {/* Emergency Contact */}
+            {data.profile?.emergencyContact?.name && (
+              <div className="mt-6">
+                <p className="text-xs font-bold uppercase text-ink-400">Emergency Contact</p>
+                <div className="mt-2">
+                  <DetailItem
+                    icon={<Phone className="h-4 w-4" />}
+                    label={data.profile.emergencyContact.relation || 'Contact'}
+                    value={[data.profile.emergencyContact.name, data.profile.emergencyContact.phone]
+                      .filter(Boolean)
+                      .join(' • ')}
+                  />
                 </div>
               </div>
             )}
@@ -864,10 +880,12 @@ function DetailItem({ icon, label, value }: { icon: React.ReactNode; label: stri
 }
 
 function MessageStudentModal({
+  applicationId,
   studentEmail,
   studentName,
   onClose,
 }: {
+  applicationId: string;
   studentEmail: string;
   studentName: string;
   onClose: () => void;
@@ -884,11 +902,13 @@ function MessageStudentModal({
     }
     setSending(true);
     try {
-      // Messages delivered via platform notification system
-      await import('../../services/apiClient').then(({ apiClient }) =>
-        apiClient.post('/notifications', { recipientEmail: studentEmail, subject, body })
-      );
-      toast.success(`Message sent to ${studentName}`);
+      const res = await ngoApi.sendStudentMessage({
+        applicationId,
+        recipientEmail: studentEmail,
+        subject: subject.trim(),
+        body: body.trim(),
+      });
+      toast.success(res.emailed ? `Message sent to ${studentName}` : res.message);
       onClose();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Failed to send message');

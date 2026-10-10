@@ -3,10 +3,11 @@ import { Link } from 'react-router-dom';
 import {
   FileText, Award, Bookmark, Calendar, Search, ArrowRight,
   CheckCircle2, Clock, TrendingUp, Bell, BookOpen, Star,
-  ChevronRight, AlertCircle, GraduationCap,
+  ChevronRight, AlertCircle, GraduationCap, Building2,
 } from 'lucide-react';
-import { useAuth } from '../../context/AuthContext';
+import { useAuth } from '../../context/useAuth';
 import { studentApi } from '../../services/studentApi';
+import { publicApi } from '../../services/publicApi';
 import { StudentLayout } from '../../components/student/StudentLayout';
 import { Skeleton } from '../../components/ui/Loading';
 import type { StudentDashboardStats, ApplicationWithCourse } from '../../types/student';
@@ -29,15 +30,17 @@ export function StudentDashboardPage() {
   const [upcomingInterviews, setUpcomingInterviews] = useState<ApplicationWithCourse[]>([]);
   const [upcomingDeadlines, setUpcomingDeadlines] = useState<{ applicationId: string; course: unknown; daysLeft: number }[]>([]);
   const [profileScore, setProfileScore] = useState(0);
+  const [verifiedNGOCount, setVerifiedNGOCount] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     let active = true;
     (async () => {
       try {
-        const [dashData, profileData] = await Promise.all([
+        const [dashData, profileData, ngoData] = await Promise.all([
           studentApi.getDashboardStats(),
           studentApi.getProfile(),
+          publicApi.getVerifiedNGOCount(),
         ]);
         if (active) {
           setStats(dashData.stats);
@@ -45,6 +48,7 @@ export function StudentDashboardPage() {
           setUpcomingInterviews(dashData.upcomingInterviews);
           setUpcomingDeadlines(dashData.upcomingDeadlines);
           setProfileScore(profileData.profileCompletionScore);
+          setVerifiedNGOCount(ngoData.total);
         }
       } catch {
         // silently fail — show empty states
@@ -60,6 +64,9 @@ export function StudentDashboardPage() {
     { icon: Star, label: 'Active', value: stats?.activeApplications ?? 0, to: '/student/applications', tone: 'bg-amber-50 text-amber-600' },
     { icon: Award, label: 'Certificates', value: stats?.certificates ?? 0, to: '/student/certificates', tone: 'bg-teal-50 text-teal-600' },
     { icon: Bookmark, label: 'Saved', value: stats?.savedCourses ?? 0, to: '/student/saved', tone: 'bg-emerald-50 text-emerald-600' },
+    ...(verifiedNGOCount !== null && verifiedNGOCount > 0 ? [{
+      icon: Building2, label: 'Verified NGOs', value: verifiedNGOCount, to: '/student/ngos', tone: 'bg-sky-50 text-sky-600',
+    }] : []),
   ];
 
   const journeySteps = [
@@ -112,11 +119,11 @@ export function StudentDashboardPage() {
 
       {/* Stat cards */}
       {loading ? (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          {Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-28 rounded-3xl" />)}
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
+          {Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-28 rounded-3xl" />)}
         </div>
       ) : (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
           {statCards.map((s) => (
             <Link key={s.label} to={s.to}>
               <div className="rounded-3xl bg-white p-5 shadow-card ring-1 ring-inset ring-ink-200/50 transition-all hover:-translate-y-0.5 hover:shadow-float">
@@ -269,6 +276,7 @@ export function StudentDashboardPage() {
             <div className="space-y-2">
               {[
                 { to: '/student/discover', icon: Search, label: 'Browse Programs', color: 'text-brand-600 bg-brand-50' },
+                { to: '/student/ngos', icon: Building2, label: 'Explore Verified NGOs', color: 'text-sky-600 bg-sky-50' },
                 { to: '/student/applications', icon: FileText, label: 'My Applications', color: 'text-amber-600 bg-amber-50' },
                 { to: '/student/profile', icon: Bell, label: 'Update Profile', color: 'text-teal-600 bg-teal-50' },
               ].map((action) => (

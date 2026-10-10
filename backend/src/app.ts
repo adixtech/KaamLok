@@ -38,12 +38,12 @@ export function createApp(): Application {
   app.use(express.urlencoded({ extended: true }));
   app.use(cookieParser());
 
-  // Rate limiting — stricter for auth endpoints
+// Rate limiting for auth endpoints (login/register/otp).
+  // Configurable; defaults are dev-safe (50 requests / 15 min) so a developer
+  // never gets locked out while still bounding credential-stuffing scripts.
   const authLimiter = rateLimit({
-    windowMs: 15 * 60 * 1000,
-    max: 1000, // 👈 Temporary high number so localhost won't lock you out
-    // windowMs: config.rateLimit.windowMs,
-    // max: config.rateLimit.authMax,
+    windowMs: config.rateLimit.windowMs,
+    max: config.rateLimit.authMax,
     message: { message: 'Too many requests. Please try again later.', code: 'RATE_LIMITED' },
     standardHeaders: true,
     legacyHeaders: false,
@@ -65,7 +65,10 @@ export function createApp(): Application {
   //add for students
   app.use('/api/student', studentRoutes);
   //end
-  app.use('/api/courses', courseRoutes);
+  // NOTE: courseRoutes is admin-only (router.use(authenticateAdmin)) and is
+  // mounted once, at /api/admin/courses. It is deliberately NOT also mounted at
+  // /api/courses: that duplicated mount published admin-gated handlers behind a
+  // public-looking path. Public course browsing lives in publicRoutes.
   app.use('/api/public', publicRoutes);
 
   // 404 + error handling

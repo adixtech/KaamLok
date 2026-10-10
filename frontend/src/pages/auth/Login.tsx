@@ -7,7 +7,7 @@ import { AuthLayout } from '../../components/auth/AuthLayout';
 import { Input, PasswordInput } from '../../components/ui/Input';
 import { Button } from '../../components/ui/Button';
 import { Spinner } from '../../components/ui/Loading';
-import { useAuth } from '../../context/AuthContext';
+import { useAuth } from '../../context/useAuth';
 import type { LoginPayload, AuthUser } from '../../types/auth';
 
 /**

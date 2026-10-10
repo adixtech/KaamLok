@@ -178,18 +178,24 @@ export interface StudentProfile {
   skills: string[];
 }
 
+/**
+ * Mirrors the `educationDetails` sub-document on the backend StudentProfile model.
+ * Field names must match the schema exactly or the UI renders blanks.
+ */
 export interface EducationDetail {
-  qualification?: string;
+  degree?: string;
   institution?: string;
-  board?: string;
-  year?: string;
-  percentage?: string;
+  yearOfCompletion?: number;
+  percentage?: number;
 }
 
+/** Mirrors the `experience` sub-document on the backend StudentProfile model. */
 export interface ExperienceDetail {
   title?: string;
-  organization?: string;
-  duration?: string;
+  company?: string;
+  startDate?: string;
+  endDate?: string;
+  current?: boolean;
   description?: string;
 }
 
@@ -213,7 +219,7 @@ export interface FullStudentProfile {
   emergencyContact?: { name?: string; phone?: string; relation?: string };
   resume?: string;
   portfolio?: string;
-  socialLinks?: { linkedin?: string; github?: string; website?: string };
+  socialLinks?: { linkedin?: string; github?: string; website?: string; twitter?: string };
   profileCompletionScore?: number;
 }
 
@@ -238,6 +244,14 @@ export interface StudentProfileDetail {
     createdAt: string;
     statusHistory: { status: ApplicationStatus; changedAt: string; note?: string }[];
   };
+  course?: {
+    _id: string;
+    title: string;
+    slug: string;
+    category?: string;
+    mode?: string;
+    ngoName?: string;
+  } | null;
 }
 
 export interface Application {

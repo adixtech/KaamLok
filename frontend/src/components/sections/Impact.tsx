@@ -1,15 +1,20 @@
+import { useEffect, useState } from 'react';
 import { Users, BookOpen, Building2, Award } from 'lucide-react';
 import { useReveal, useCountUp } from '../../hooks/useReveal';
 import { Reveal } from '../Reveal';
+import { publicApi } from '../../services/publicApi';
 
-const stats = [
-  { icon: Users, value: 15000, suffix: '+', label: 'Students', tone: 'brand' },
-  { icon: BookOpen, value: 150, suffix: '+', label: 'Programs', tone: 'teal' },
-  { icon: Building2, value: 50, suffix: '+', label: 'Verified NGOs', tone: 'amber' },
-  { icon: Award, value: 5000, suffix: '+', label: 'Career Success Stories', tone: 'emerald' },
-];
+type StatTone = 'brand' | 'teal' | 'amber' | 'emerald';
 
-const toneMap = {
+interface StatItem {
+  icon: typeof Users;
+  value: number;
+  suffix: string;
+  label: string;
+  tone: StatTone;
+}
+
+const toneMap: Record<StatTone, string> = {
   brand: 'from-brand-500 to-brand-700',
   teal: 'from-teal-500 to-teal-700',
   amber: 'from-amber-400 to-amber-600',
@@ -22,6 +27,42 @@ function formatNumber(n: number) {
 
 export function Impact() {
   const { ref, visible } = useReveal<HTMLDivElement>({ threshold: 0.3 });
+  const [verifiedCount, setVerifiedCount] = useState<number | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    (async () => {
+      try {
+        const data = await publicApi.getVerifiedNGOCount();
+        if (active) setVerifiedCount(data.total);
+      } catch {
+        // Leave as null — stat will be omitted
+      }
+    })();
+    return () => { active = false; };
+  }, []);
+
+  const stats: StatItem[] = [
+    { icon: Users, value: 15000, suffix: '+', label: 'Students', tone: 'brand' },
+    { icon: BookOpen, value: 150, suffix: '+', label: 'Programs', tone: 'teal' },
+    { icon: Building2, value: 50, suffix: '+', label: 'Verified NGOs', tone: 'amber' },
+    { icon: Award, value: 5000, suffix: '+', label: 'Career Success Stories', tone: 'emerald' },
+  ];
+
+  // Replace the hardcoded Verified NGOs stat with the real backend count.
+  // Only show this stat when we have a real, non-zero count.
+  const displayStats = stats.filter((s) => {
+    if (s.label === 'Verified NGOs') {
+      return verifiedCount !== null && verifiedCount > 0;
+    }
+    return true;
+  }).map((s) => {
+    if (s.label === 'Verified NGOs' && verifiedCount !== null) {
+      return { ...s, value: verifiedCount, suffix: verifiedCount > 0 ? '+' : '' };
+    }
+    return s;
+  });
+
   return (
     <section className="py-20 sm:py-24 lg:py-28">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
@@ -47,7 +88,7 @@ export function Impact() {
             </div>
 
             <div className="relative mt-12 grid grid-cols-2 gap-6 lg:grid-cols-4">
-              {stats.map((s, i) => (
+              {displayStats.map((s, i) => (
                 <Counter key={s.label} stat={s} start={visible} delay={i * 150} />
               ))}
             </div>
@@ -63,7 +104,7 @@ function Counter({
   start,
   delay,
 }: {
-  stat: (typeof stats)[number];
+  stat: StatItem;
   start: boolean;
   delay: number;
 }) {
@@ -74,7 +115,7 @@ function Counter({
       style={{ opacity: start ? 1 : 0, transitionDelay: `${delay}ms` }}
     >
       <span
-        className={`mx-auto grid h-14 w-14 place-items-center rounded-2xl bg-gradient-to-br ${toneMap[stat.tone as keyof typeof toneMap]} text-white shadow-soft`}
+        className={`mx-auto grid h-14 w-14 place-items-center rounded-2xl bg-gradient-to-br ${toneMap[stat.tone]} text-white shadow-soft`}
       >
         <stat.icon className="h-7 w-7" strokeWidth={2} />
       </span>

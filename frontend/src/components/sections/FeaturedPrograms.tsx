@@ -83,7 +83,7 @@ export function FeaturedPrograms() {
           <div className="mt-14 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
             {courses.map((c, i) => (
               <Reveal key={c._id} delay={i * 80}>
-                <CourseCard course={c} index={i} />
+                <CourseCard course={c} />
               </Reveal>
             ))}
           </div>

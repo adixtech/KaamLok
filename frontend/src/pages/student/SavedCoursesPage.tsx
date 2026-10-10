@@ -16,6 +16,12 @@ export function SavedCoursesPage() {
   const [totalPages, setTotalPages] = useState(1);
   const [removingId, setRemovingId] = useState<string | null>(null);
   const [search, setSearch] = useState('');
+  const [now, setNow] = useState(() => Date.now());
+
+  useEffect(() => {
+    const interval = setInterval(() => setNow(Date.now()), 60000);
+    return () => clearInterval(interval);
+  }, []);
 
   const fetchSaved = useCallback(async () => {
     try {
@@ -32,7 +38,10 @@ export function SavedCoursesPage() {
     }
   }, [page]);
 
-  useEffect(() => { fetchSaved(); }, [fetchSaved]);
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    fetchSaved();
+  }, [fetchSaved]);
 
   const handleRemove = async (courseId: string) => {
     setRemovingId(courseId);
@@ -107,7 +116,7 @@ export function SavedCoursesPage() {
               const c = s.course;
               if (!c) return null;
               const daysLeft = c.schedule?.applicationEnd
-                ? Math.ceil((new Date(c.schedule.applicationEnd).getTime() - Date.now()) / (1000 * 60 * 60 * 24))
+                ? Math.ceil((new Date(c.schedule.applicationEnd).getTime() - now) / (1000 * 60 * 60 * 24))
                 : null;
               const isFull = (c.availableSeats ?? 0) <= 0;
               const isClosed = daysLeft !== null && daysLeft < 0;

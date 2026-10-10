@@ -2,7 +2,7 @@ import { Link } from 'react-router-dom';
 import { Clock, ShieldCheck, Mail, ArrowRight, LogOut } from 'lucide-react';
 import { Logo } from '../../components/Logo';
 import { Button } from '../../components/ui/Button';
-import { useAuth } from '../../context/AuthContext';
+import { useAuth } from '../../context/useAuth';
 
 /**
  * Pending Approval page shown to NGOs whose verificationStatus !== 'approved'.

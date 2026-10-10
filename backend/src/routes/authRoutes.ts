@@ -27,5 +27,6 @@ router.get('/me', authenticate, ctrl.getMe);
 router.post('/forgot-password', forgotPasswordValidators, validate, ctrl.forgotPassword);
 router.post('/verify-reset-otp', otpValidators, validate, ctrl.verifyResetOTP);
 router.post('/reset-password', resetPasswordValidators, validate, ctrl.resetPassword);
+router.post('/change-password', authenticate, ctrl.changePassword);
 
 export default router;

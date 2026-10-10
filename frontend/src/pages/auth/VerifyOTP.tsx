@@ -6,7 +6,7 @@ import { AuthLayout } from '../../components/auth/AuthLayout';
 import { OTPInput } from '../../components/ui/OTPInput';
 import { Button } from '../../components/ui/Button';
 import { Spinner } from '../../components/ui/Loading';
-import { useAuth } from '../../context/AuthContext';
+import { useAuth } from '../../context/useAuth';
 import { useCountdown } from '../../hooks/useCountdown';
 
 export function VerifyOTP() {

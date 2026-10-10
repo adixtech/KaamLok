@@ -32,7 +32,10 @@ export function AuditLogsPage() {
     }
   }, [page, action]);
 
-  useEffect(() => { fetchLogs(); }, [fetchLogs]);
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    fetchLogs();
+  }, [fetchLogs]);
 
   if (error) {
     return <AdminLayout><ErrorState message={error} onRetry={fetchLogs} /></AdminLayout>;

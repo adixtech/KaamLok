@@ -5,7 +5,7 @@ import {
   Bell, User, Settings, ChevronLeft, LogOut,
 } from 'lucide-react';
 import { Logo } from '../Logo';
-import { useAuth } from '../../context/AuthContext';
+import { useAuth } from '../../context/useAuth';
 
 type NavItem = {
   to: string;

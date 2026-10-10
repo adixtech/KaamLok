@@ -3,7 +3,8 @@ import toast from 'react-hot-toast';
 import { Bell, CheckCheck, Trash2, Mail, MailOpen } from 'lucide-react';
 import { AdminLayout } from '../../components/admin/AdminLayout';
 import { AdminPagination } from '../../components/admin/AdminPagination';
-import { AdminBadge, statusTone } from '../../components/admin/AdminBadge';
+import { AdminBadge } from '../../components/admin/AdminBadge';
+import { statusTone } from '../../utils/adminStatus';
 import { AdminButton } from '../../components/admin/AdminButton';
 import { AdminModal } from '../../components/admin/AdminModal';
 import { EmptyState, ErrorState } from '../../components/admin/AdminLoading';
@@ -36,7 +37,10 @@ export function NotificationsPage() {
     }
   }, [page, unreadOnly]);
 
-  useEffect(() => { fetchNotifications(); }, [fetchNotifications]);
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    fetchNotifications();
+  }, [fetchNotifications]);
 
   const markRead = async (id: string) => {
     try {

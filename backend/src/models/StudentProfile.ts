@@ -50,6 +50,20 @@ export interface IStudentProfile extends Document {
     website?: string;
     twitter?: string;
   };
+  // Settings
+  notificationSettings?: {
+    emailNotifications: boolean;
+    applicationUpdates: boolean;
+    interviewReminders: boolean;
+    courseRecommendations: boolean;
+    marketingEmails: boolean;
+  };
+  preferences?: {
+    language: string;
+    timezone: string;
+    dateFormat: string;
+  };
+
   // Profile completion
   profileCompletionScore: number;
   createdAt: Date;
@@ -100,6 +114,20 @@ const studentProfileSchema = new Schema<IStudentProfile>(
       twitter: { type: String },
     },
     profileCompletionScore: { type: Number, default: 0, min: 0, max: 100 },
+
+    // Settings
+    notificationSettings: {
+      emailNotifications: { type: Boolean, default: true },
+      applicationUpdates: { type: Boolean, default: true },
+      interviewReminders: { type: Boolean, default: true },
+      courseRecommendations: { type: Boolean, default: true },
+      marketingEmails: { type: Boolean, default: false },
+    },
+    preferences: {
+      language: { type: String, default: 'en' },
+      timezone: { type: String, default: 'Asia/Kolkata' },
+      dateFormat: { type: String, default: 'DD/MM/YYYY' },
+    },
   },
   { timestamps: true }
 );

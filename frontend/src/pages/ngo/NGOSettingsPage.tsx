@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import {
   Lock, Bell, Globe, Shield, Trash2, Eye, EyeOff,
   Check, AlertCircle, Clock, Mail, MessageSquare,
@@ -6,6 +6,8 @@ import {
 import { NGOLayout } from '../../components/ngo/NGOLayout';
 import toast from 'react-hot-toast';
 import { apiClient } from '../../services/apiClient';
+import { ngoApi } from '../../services/ngoApi';
+import { useAuth } from '../../context/useAuth';
 
 type SettingsSection = 'password' | 'notifications' | 'preferences' | 'privacy' | 'danger';
 
@@ -15,7 +17,10 @@ interface PasswordForm {
   confirmPassword: string;
 }
 
-interface NotificationSettings {
+// Declared as type aliases (not interfaces) so they carry an implicit index
+// signature and satisfy the Record<string, boolean> / Record<string, string>
+// API payloads without a cast.
+type NotificationSettings = {
   emailOnApplication: boolean;
   emailOnInterview: boolean;
   emailOnCourseExpiry: boolean;
@@ -24,16 +29,35 @@ interface NotificationSettings {
   pushOnInterview: boolean;
   weeklyDigest: boolean;
   monthlyReports: boolean;
-}
+};
 
-interface Preferences {
+type Preferences = {
   language: string;
   timezone: string;
   dateFormat: string;
   emailFrequency: string;
-}
+};
+
+const NOTIFICATION_DEFAULTS: NotificationSettings = {
+  emailOnApplication: true,
+  emailOnInterview: true,
+  emailOnCourseExpiry: true,
+  emailOnDocumentStatus: true,
+  pushOnApplication: true,
+  pushOnInterview: true,
+  weeklyDigest: true,
+  monthlyReports: true,
+};
+
+const PREFERENCE_DEFAULTS: Preferences = {
+  language: 'en',
+  timezone: 'Asia/Kolkata',
+  dateFormat: 'DD/MM/YYYY',
+  emailFrequency: 'immediate',
+};
 
 export function NGOSettingsPage() {
+  const { user } = useAuth();
   const [activeSection, setActiveSection] = useState<SettingsSection>('password');
   const [passwordForm, setPasswordForm] = useState<PasswordForm>({
     currentPassword: '',
@@ -44,29 +68,36 @@ export function NGOSettingsPage() {
   const [passwordLoading, setPasswordLoading] = useState(false);
   const [passwordErrors, setPasswordErrors] = useState<Record<string, string>>({});
 
-  const [notificationSettings, setNotificationSettings] = useState<NotificationSettings>({
-    emailOnApplication: true,
-    emailOnInterview: true,
-    emailOnCourseExpiry: true,
-    emailOnDocumentStatus: true,
-    pushOnApplication: true,
-    pushOnInterview: true,
-    weeklyDigest: true,
-    monthlyReports: true,
-  });
+  const [notificationSettings, setNotificationSettings] = useState<NotificationSettings>(NOTIFICATION_DEFAULTS);
   const [notificationLoading, setNotificationLoading] = useState(false);
 
-  const [preferences, setPreferences] = useState<Preferences>({
-    language: 'en',
-    timezone: 'Asia/Kolkata',
-    dateFormat: 'DD/MM/YYYY',
-    emailFrequency: 'immediate',
-  });
+  const [preferences, setPreferences] = useState<Preferences>(PREFERENCE_DEFAULTS);
   const [preferencesLoading, setPreferencesLoading] = useState(false);
+
+  const [settingsLoading, setSettingsLoading] = useState(true);
 
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deleteConfirmText, setDeleteConfirmText] = useState('');
   const [deleteLoading, setDeleteLoading] = useState(false);
+
+  // Load persisted settings so the toggles reflect real state, not defaults.
+  const loadSettings = useCallback(async () => {
+    setSettingsLoading(true);
+    try {
+      const data = await ngoApi.getSettings();
+      setNotificationSettings({ ...NOTIFICATION_DEFAULTS, ...(data.notificationSettings ?? {}) });
+      setPreferences({ ...PREFERENCE_DEFAULTS, ...(data.preferences ?? {}) });
+    } catch {
+      // Keep defaults if settings cannot be read; the user can still save.
+    } finally {
+      setSettingsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    loadSettings();
+  }, [loadSettings]);
 
   const validatePassword = (): boolean => {
     const errs: Record<string, string> = {};
@@ -85,14 +116,15 @@ export function NGOSettingsPage() {
     if (!validatePassword()) return;
     setPasswordLoading(true);
     try {
-      await apiClient.put('/auth/change-password', {
+      await apiClient.post('/auth/change-password', {
         currentPassword: passwordForm.currentPassword,
         newPassword: passwordForm.newPassword,
       });
       toast.success('Password changed successfully');
       setPasswordForm({ currentPassword: '', newPassword: '', confirmPassword: '' });
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Failed to change password');
+      const e2 = err as { response?: { data?: { message?: string } } };
+      toast.error(e2?.response?.data?.message || 'Failed to change password');
     } finally {
       setPasswordLoading(false);
     }
@@ -101,8 +133,11 @@ export function NGOSettingsPage() {
   const handleNotificationSave = async () => {
     setNotificationLoading(true);
     try {
-      await new Promise((resolve) => setTimeout(resolve, 500));
+      await ngoApi.updateNotificationSettings(notificationSettings);
       toast.success('Notification preferences saved');
+    } catch (err) {
+      const e2 = err as { response?: { data?: { message?: string } } };
+      toast.error(e2?.response?.data?.message || 'Failed to save notification preferences');
     } finally {
       setNotificationLoading(false);
     }
@@ -111,13 +146,21 @@ export function NGOSettingsPage() {
   const handlePreferencesSave = async () => {
     setPreferencesLoading(true);
     try {
-      await new Promise((resolve) => setTimeout(resolve, 500));
+      await ngoApi.updatePreferences(preferences);
       toast.success('Preferences saved');
+    } catch (err) {
+      const e2 = err as { response?: { data?: { message?: string } } };
+      toast.error(e2?.response?.data?.message || 'Failed to save preferences');
     } finally {
       setPreferencesLoading(false);
     }
   };
 
+  /**
+   * Account closure is irreversible, so it is handled as a reviewed request
+   * rather than a self-serve delete. Submitting the contact form records a real
+   * request with the platform team instead of calling a non-existent endpoint.
+   */
   const handleDeleteOrganization = async () => {
     if (deleteConfirmText !== 'DELETE') {
       toast.error('Please type DELETE to confirm');
@@ -125,11 +168,25 @@ export function NGOSettingsPage() {
     }
     setDeleteLoading(true);
     try {
-      await apiClient.delete('/ngo/profile');
-      toast.success('Organization deletion requested');
-      window.location.href = '/';
+      await apiClient.post('/public/contact', {
+        name: user?.ngoName || `${user?.firstName ?? ''} ${user?.lastName ?? ''}`.trim() || 'NGO account holder',
+        email: user?.email || '',
+        subject: 'Organization account deletion request',
+        message: [
+          'I am requesting permanent deletion of my KaamLok organization account.',
+          '',
+          `Organization: ${user?.ngoName || user?.firstName || 'Unknown'}`,
+          `Contact email: ${user?.email || 'Unknown'}`,
+          '',
+          'Please confirm the impact on my courses and student applications before deleting.',
+        ].join('\n'),
+      });
+      toast.success('Deletion request received. Our team will contact you to confirm.');
+      setShowDeleteConfirm(false);
+      setDeleteConfirmText('');
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Failed to delete organization');
+      const e2 = err as { response?: { data?: { message?: string } } };
+      toast.error(e2?.response?.data?.message || 'Failed to submit deletion request');
     } finally {
       setDeleteLoading(false);
     }
@@ -338,7 +395,7 @@ export function NGOSettingsPage() {
 
                 <button
                   onClick={handleNotificationSave}
-                  disabled={notificationLoading}
+                  disabled={notificationLoading || settingsLoading}
                   className="mt-4 rounded-xl bg-teal-600 px-6 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-teal-700 disabled:opacity-50"
                 >
                   {notificationLoading ? 'Saving...' : 'Save Preferences'}
@@ -398,7 +455,7 @@ export function NGOSettingsPage() {
 
                 <button
                   onClick={handlePreferencesSave}
-                  disabled={preferencesLoading}
+                  disabled={preferencesLoading || settingsLoading}
                   className="mt-4 rounded-xl bg-teal-600 px-6 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-teal-700 disabled:opacity-50"
                 >
                   {preferencesLoading ? 'Saving...' : 'Save Preferences'}
@@ -475,14 +532,18 @@ export function NGOSettingsPage() {
               <div className="flex items-center gap-3">
                 <AlertCircle className="h-6 w-6 text-rose-600" />
                 <div>
-                  <h2 className="text-lg font-bold text-ink-900">Delete Organization Account</h2>
-                  <p className="text-sm text-ink-500">Permanently delete your organization and all associated data</p>
+                  <h2 className="text-lg font-bold text-ink-900">Request Account Closure</h2>
+                  <p className="text-sm text-ink-500">Ask our team to permanently delete your organization and all associated data</p>
                 </div>
               </div>
 
               <div className="mt-6 rounded-xl bg-rose-50 p-4">
                 <p className="font-medium text-rose-900">Warning: This action cannot be undone</p>
-                <ul className="mt-2 space-y-1 text-sm text-rose-700">
+                <p className="mt-2 text-sm text-rose-700">
+                  Deleting your organization is permanent. Because it affects students who have already applied
+                  to your programs, we review each request manually before removing anything.
+                </p>
+                <ul className="mt-3 space-y-1 text-sm text-rose-700">
                   <li>All your courses will be removed from the platform</li>
                   <li>All student applications will be permanently deleted</li>
                   <li>Your profile and documents will be removed</li>
@@ -495,7 +556,7 @@ export function NGOSettingsPage() {
                 className="mt-6 inline-flex items-center gap-2 rounded-xl bg-rose-600 px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-rose-700"
               >
                 <Trash2 className="h-4 w-4" />
-                Request Account Deletion
+                Request Account Closure
               </button>
             </div>
           )}
@@ -512,8 +573,8 @@ export function NGOSettingsPage() {
             </div>
 
             <p className="mt-4 text-sm text-ink-600">
-              This action is permanent and cannot be undone. All your data including courses,
-              applications, documents, and analytics will be permanently deleted.
+              This request is reviewed by our team before anything is removed. Once approved,
+              all your data including courses, applications, documents, and analytics will be permanently deleted.
             </p>
 
             <div className="mt-4">
@@ -544,7 +605,7 @@ export function NGOSettingsPage() {
                 disabled={deleteLoading || deleteConfirmText !== 'DELETE'}
                 className="flex-1 rounded-xl bg-rose-600 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-rose-700 disabled:opacity-50"
               >
-                {deleteLoading ? 'Deleting...' : 'Delete Permanently'}
+                {deleteLoading ? 'Submitting...' : 'Submit Request'}
               </button>
             </div>
           </div>

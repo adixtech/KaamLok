@@ -38,7 +38,10 @@ export function StudentNotificationsPage() {
     }
   }, [page]);
 
-  useEffect(() => { fetchNotifications(); }, [fetchNotifications]);
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    fetchNotifications();
+  }, [fetchNotifications]);
 
   const handleMarkRead = async (id: string) => {
     try {

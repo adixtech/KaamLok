@@ -3,7 +3,34 @@ import { NewsletterSubscriber } from '../models/NewsletterSubscriber';
 import { ContactMessage } from '../models/ContactMessage';
 import { NGOProfile, type INGOProfile } from '../models/NGOProfile';
 import { Course } from '../models/Course';
+import { User } from '../models/User';
 import { ApiError } from '../utils/errors';
+
+/**
+ * Canonical "verified + active" NGO user IDs.
+ * An NGO is publicly visible only when:
+ *   NGOProfile.verificationStatus === 'approved'
+ *   AND the associated User.status === 'active' (not blocked/pending)
+ * Callers must always use this to build the base filter.
+ */
+async function getVisibleNGOUserIds(): Promise<string[]> {
+  const activeUsers = await User.find({ role: 'ngo', status: 'active' })
+    .select('_id')
+    .lean();
+  return activeUsers.map((u) => u._id.toString());
+}
+
+/**
+ * Build the base query for publicly-visible NGO profiles.
+ * Ensures a single source of truth across directory, count, and featured endpoints.
+ */
+async function buildVisibleNGOQuery(): Promise<Record<string, unknown>> {
+  const userIds = await getVisibleNGOUserIds();
+  return {
+    verificationStatus: 'approved',
+    user: { $in: userIds },
+  };
+}
 
 /**
  * Public Service - Business logic for public-facing routes
@@ -138,11 +165,12 @@ export const publicService = {
 
   // ─── NGO Public Profile ───────────────────────────────────────
   async getNGOProfileBySlug(slugOrId: string) {
-    let profile = await NGOProfile.findOne({ slug: slugOrId, verificationStatus: 'approved' });
+    const baseQuery = await buildVisibleNGOQuery();
+    let profile = await NGOProfile.findOne({ ...baseQuery, slug: slugOrId });
     if (!profile) {
       const { isValidObjectId } = await import('mongoose');
       if (isValidObjectId(slugOrId)) {
-        profile = await NGOProfile.findOne({ user: slugOrId, verificationStatus: 'approved' });
+        profile = await NGOProfile.findOne({ ...baseQuery, user: slugOrId });
       }
     }
     if (!profile) throw new ApiError(404, 'NGO not found', 'NGO_NOT_FOUND');
@@ -185,10 +213,11 @@ export const publicService = {
   },
 
   async getFeaturedNGOs(limit = 8) {
-    const profiles = await NGOProfile.find({ verificationStatus: 'approved' })
+    const baseQuery = await buildVisibleNGOQuery();
+    const profiles = await NGOProfile.find(baseQuery)
       .sort({ studentsTrained: -1, createdAt: -1 })
       .limit(limit)
-      .select('ngoName slug logo description city state studentsTrained sectorsFocused establishedYear socialLinks');
+      .select('user ngoName slug logo description city state studentsTrained sectorsFocused establishedYear socialLinks');
 
     const profilesWithCounts = await Promise.all(
       profiles.map(async (p) => {
@@ -214,6 +243,85 @@ export const publicService = {
     );
 
     return { ngos: profilesWithCounts };
+  },
+
+  // ─── Verified NGO Directory ────────────────────────────────────
+  async getVerifiedNGOs(params: {
+    page?: number;
+    limit?: number;
+    search?: string;
+    state?: string;
+    sector?: string;
+  }) {
+    const { page = 1, limit = 12, search, state, sector } = params;
+    const skip = (page - 1) * limit;
+
+    const query = await buildVisibleNGOQuery();
+    if (state) query.state = { $regex: state, $options: 'i' };
+    if (sector) query.sectorsFocused = { $in: [new RegExp(sector, 'i')] };
+    if (search) {
+      query.$or = [
+        { ngoName: { $regex: search, $options: 'i' } },
+        { description: { $regex: search, $options: 'i' } },
+        { sectorsFocused: { $regex: search, $options: 'i' } },
+        { city: { $regex: search, $options: 'i' } },
+      ];
+    }
+
+    const [ngos, total] = await Promise.all([
+      NGOProfile.find(query)
+        .sort({ studentsTrained: -1, createdAt: -1 })
+        .skip(skip)
+        .limit(limit)
+        // `user` is required: the per-NGO active-course count below filters on
+        // it. Without it the filter becomes { ngoId: undefined }, which matches
+        // every published course platform-wide.
+        .select('user ngoName slug logo coverImage description city state studentsTrained sectorsFocused establishedYear socialLinks'),
+      NGOProfile.countDocuments(query),
+    ]);
+
+    const ngosWithCounts = await Promise.all(
+      ngos.map(async (n) => {
+        const activeCourses = await Course.countDocuments({
+          ngoId: n.user,
+          status: 'published',
+          isPublished: true,
+        });
+        return {
+          _id: n._id.toString(),
+          ngoName: n.ngoName,
+          slug: n.slug,
+          logo: n.logo,
+          coverImage: n.coverImage,
+          description: n.description,
+          city: n.city,
+          state: n.state,
+          studentsTrained: n.studentsTrained || 0,
+          sectorsFocused: n.sectorsFocused || [],
+          establishedYear: n.establishedYear,
+          activeCourses,
+        };
+      })
+    );
+
+    return {
+      ngos: ngosWithCounts,
+      pagination: { page, limit, total, pages: Math.ceil(total / limit) },
+    };
+  },
+
+  async getVerifiedNGOCount() {
+    const baseQuery = await buildVisibleNGOQuery();
+    const total = await NGOProfile.countDocuments(baseQuery);
+    const states = await NGOProfile.distinct('state', {
+      ...baseQuery,
+      state: { $nin: [null, '', undefined] },
+    });
+    const sectors = await NGOProfile.distinct('sectorsFocused', {
+      ...baseQuery,
+      sectorsFocused: { $nin: [null, '', undefined] },
+    });
+    return { total, states: states.filter(Boolean), sectors: sectors.filter(Boolean) };
   },
 
   // ─── Contact Messages ─────────────────────────────────────────

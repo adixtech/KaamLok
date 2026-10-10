@@ -1,10 +1,20 @@
-import { useState } from 'react';
-import {  Lock, Bell, Shield, Trash2, CheckCircle2 } from 'lucide-react';
+import { useCallback, useEffect, useState } from 'react';
+import {  Lock, Bell, Shield, Trash2, CheckCircle2, Loader2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { StudentLayout } from '../../components/student/StudentLayout';
 import { Input } from '../../components/ui/Input';
 import { Button } from '../../components/ui/Button';
 import { apiClient } from '../../services/apiClient';
+import { studentApi } from '../../services/studentApi';
+
+// Module scope so the reference is stable across renders.
+const NOTIFICATION_DEFAULTS = {
+  applicationUpdates: true,
+  interviewReminders: true,
+  trainingReminders: true,
+  announcements: true,
+  newsletter: false,
+};
 
 export function StudentSettingsPage() {
   const [tab, setTab] = useState<'password' | 'notifications' | 'privacy' | 'account'>('password');
@@ -15,13 +25,42 @@ export function StudentSettingsPage() {
   const [pwSaving, setPwSaving] = useState(false);
   const [pwSuccess, setPwSuccess] = useState(false);
 
-  const [notifications, setNotifications] = useState({
-    applicationUpdates: true,
-    interviewReminders: true,
-    trainingReminders: true,
-    announcements: true,
-    newsletter: false,
-  });
+  // Notification preferences — loaded from and persisted to the API.
+  const [notifications, setNotifications] = useState(NOTIFICATION_DEFAULTS);
+  const [prefsLoading, setPrefsLoading] = useState(true);
+  const [prefsSaving, setPrefsSaving] = useState(false);
+
+  const loadSettings = useCallback(async () => {
+    setPrefsLoading(true);
+    try {
+      const data = await studentApi.getSettings();
+      const saved = data.notificationSettings as Partial<typeof NOTIFICATION_DEFAULTS> | undefined;
+      setNotifications({ ...NOTIFICATION_DEFAULTS, ...(saved ?? {}) });
+    } catch {
+      // Fall back to defaults rather than blocking the page on a settings outage.
+      setNotifications(NOTIFICATION_DEFAULTS);
+    } finally {
+      setPrefsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    loadSettings();
+  }, [loadSettings]);
+
+  const saveNotifications = async () => {
+    setPrefsSaving(true);
+    try {
+      await studentApi.updateNotificationSettings(notifications);
+      toast.success('Notification preferences saved');
+    } catch (err) {
+      const e = err as { response?: { data?: { message?: string } } };
+      toast.error(e?.response?.data?.message || 'Failed to save preferences');
+    } finally {
+      setPrefsSaving(false);
+    }
+  };
 
   const handlePasswordChange = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -96,35 +135,43 @@ export function StudentSettingsPage() {
         {tab === 'notifications' && (
           <div>
             <h2 className="mb-4 font-bold text-ink-900">Notification Preferences</h2>
-            <div className="space-y-4">
-              {Object.entries(notifications).map(([key, value]) => {
-                const labels: Record<string, { label: string; description: string }> = {
-                  applicationUpdates: { label: 'Application Updates', description: 'Status changes on your applications' },
-                  interviewReminders: { label: 'Interview Reminders', description: 'Reminders before your scheduled interviews' },
-                  trainingReminders: { label: 'Training Reminders', description: 'Upcoming training session reminders' },
-                  announcements: { label: 'Announcements', description: 'Platform announcements and new features' },
-                  newsletter: { label: 'Newsletter', description: 'Weekly newsletter with new programs' },
-                };
-                const info = labels[key];
-                return (
-                  <div key={key} className="flex items-center justify-between rounded-xl border border-ink-200 p-4">
-                    <div>
-                      <p className="text-sm font-semibold text-ink-900">{info.label}</p>
-                      <p className="text-xs text-ink-400">{info.description}</p>
+            {prefsLoading ? (
+              <div className="flex items-center gap-2 py-8 text-sm text-ink-500">
+                <Loader2 className="h-4 w-4 animate-spin" /> Loading preferences...
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {Object.entries(notifications).map(([key, value]) => {
+                  const labels: Record<string, { label: string; description: string }> = {
+                    applicationUpdates: { label: 'Application Updates', description: 'Status changes on your applications' },
+                    interviewReminders: { label: 'Interview Reminders', description: 'Reminders before your scheduled interviews' },
+                    trainingReminders: { label: 'Training Reminders', description: 'Upcoming training session reminders' },
+                    announcements: { label: 'Announcements', description: 'Platform announcements and new features' },
+                    newsletter: { label: 'Newsletter', description: 'Weekly newsletter with new programs' },
+                  };
+                  const info = labels[key];
+                  return (
+                    <div key={key} className="flex items-center justify-between rounded-xl border border-ink-200 p-4">
+                      <div>
+                        <p className="text-sm font-semibold text-ink-900">{info.label}</p>
+                        <p className="text-xs text-ink-400">{info.description}</p>
+                      </div>
+                      <button
+                        onClick={() => setNotifications((prev) => ({ ...prev, [key]: !prev[key as keyof typeof prev] }))}
+                        aria-label={`Toggle ${info.label}`}
+                        aria-pressed={value}
+                        className={`relative h-6 w-11 rounded-full transition-colors ${value ? 'bg-brand-600' : 'bg-ink-200'}`}
+                      >
+                        <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow-soft transition-transform ${value ? 'translate-x-5' : 'translate-x-0.5'}`} />
+                      </button>
                     </div>
-                    <button
-                      onClick={() => setNotifications((prev) => ({ ...prev, [key]: !prev[key as keyof typeof prev] }))}
-                      className={`relative h-6 w-11 rounded-full transition-colors ${value ? 'bg-brand-600' : 'bg-ink-200'}`}
-                    >
-                      <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow-soft transition-transform ${value ? 'translate-x-5' : 'translate-x-0.5'}`} />
-                    </button>
-                  </div>
-                );
-              })}
-              <Button variant="primary" size="md" onClick={() => toast.success('Notification preferences saved!')}>
-                Save Preferences
-              </Button>
-            </div>
+                  );
+                })}
+                <Button variant="primary" size="md" loading={prefsSaving} onClick={saveNotifications}>
+                  Save Preferences
+                </Button>
+              </div>
+            )}
           </div>
         )}
 

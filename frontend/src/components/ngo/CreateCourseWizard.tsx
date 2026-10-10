@@ -8,6 +8,7 @@ import {
 import { NGOLayout } from '../../components/ngo/NGOLayout';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
+import { CommaSeparatedInput } from '../../components/ui/CommaSeparatedInput';
 import { ngoApi } from '../../services/ngoApi';
 import type {  CourseMode, Difficulty, Benefit, Recognition, GenderRequirement } from '../../types/ngo';
 import { BENEFIT_LABELS, RECOGNITION_LABELS, DIFFICULTY_LEVELS, TRAINING_DAYS } from '../../types/ngo';
@@ -201,56 +202,54 @@ export function CreateCoursePage() {
   }, [editId, navigate]);
 
 
-  // const saveDraft = useCallback(async () => {
-  //   if (!formData.title) return;
-  //   setDraftSaving(true);
-  //   try {
-  //     if (courseId) {
-  //       await ngoApi.updateCourse(courseId, formData);
-  //     } else {
-  //       const result = await ngoApi.createCourse(formData);
-  //       setCourseId(result.course._id);
-  //     }
-  //     toast.success('Draft saved');
-  //   } catch {
-  //     toast.error('Failed to save draft');
-  //   } finally {
-  //     setDraftSaving(false);
-  //   }
-  // }, [formData, courseId]);
+  /**
+   * Fields that must never be echoed back on an update: `status` is owned by the
+   * explicit publish/pause/resume endpoints (sending it trips the backend's
+   * COURSE_PUBLISHED guard), and the rest are server-owned/read-only.
+   */
+  const buildUpdatePayload = useCallback((): Record<string, unknown> => {
+    const {
+      status: _status,
+      isPublished: _isPublished,
+      publishedAt: _publishedAt,
+      slug: _slug,
+      _id: __id,
+      __v: ___v,
+      createdAt: _createdAt,
+      updatedAt: _updatedAt,
+      enrolledStudents: _enrolledStudents,
+      enrolledCount: _enrolledCount,
+      ...cleanPayload
+    } = formData as Record<string, unknown>;
+    return cleanPayload;
+  }, [formData]);
 
-  // add by aditya for (Change it to destructure and strip out fields that should not be edited on a live, published course before sending it over the network.)
-    const saveDraft = useCallback(async () => {
-    if (!formData.title) return;
+  /** Persist the wizard, creating the course on first save. Returns the course id. */
+  const persistCourse = useCallback(async (): Promise<string> => {
+    if (courseId) {
+      await ngoApi.updateCourse(courseId, buildUpdatePayload());
+      return courseId;
+    }
+    const result = await ngoApi.createCourse(formData);
+    setCourseId(result.course._id);
+    return result.course._id;
+  }, [courseId, formData, buildUpdatePayload]);
+
+  const saveDraft = useCallback(async () => {
+    if (!formData.title?.trim()) {
+      toast.error('Add a course title before saving');
+      return;
+    }
     setDraftSaving(true);
     try {
-      if (courseId) {
-        // 1. Destructure out the system keys that trigger COURSE_PUBLISHED errors
-        const { 
-          status, 
-          _id, 
-          __v, 
-          createdAt, 
-          updatedAt, 
-          enrolledStudents, 
-          enrolledCount, 
-          ...cleanPayload 
-        } = formData as any;
-
-        // 2. Submit only the cleaned payload of editable properties
-        await ngoApi.updateCourse(courseId, cleanPayload);
-      } else {
-        await ngoApi.createCourse(formData);
-        const result = await ngoApi.createCourse(formData);
-        setCourseId(result.course._id);
-      }
+      await persistCourse();
       toast.success('Draft saved');
-    } catch {
-      toast.error('Failed to save draft');
+    } catch (err) {
+      toast.error((err as Error)?.message || 'Failed to save draft');
     } finally {
       setDraftSaving(false);
     }
-  }, [formData, courseId]);
+  }, [formData.title, persistCourse]);
 
 
   const updateField = (field: string, value: unknown) => {
@@ -265,10 +264,15 @@ export function CreateCoursePage() {
     }));
   };
 
-  const validateStep = (): boolean => {
+  /**
+   * Validate a wizard step. `stepIndex` defaults to the visible step; passing it
+   * explicitly lets publish validate every step without moving the user around.
+   * Errors are only written to state for the step actually on screen.
+   */
+  const validateStepAt = (stepIndex: number, commitErrors = true): boolean => {
     const newErrors: Record<string, string> = {};
 
-    switch (STEPS[currentStep].id) {
+    switch (STEPS[stepIndex].id) {
       case 'details':
         if (!formData.title?.trim()) newErrors.title = 'Course title is required';
         if (!formData.shortDescription?.trim()) newErrors.shortDescription = 'Short description is required';
@@ -305,9 +309,11 @@ export function CreateCoursePage() {
         break;
     }
 
-    setErrors(newErrors);
+    if (commitErrors) setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
+
+  const validateStep = (): boolean => validateStepAt(currentStep);
 
   const handleNext = () => {
     if (validateStep()) {
@@ -320,16 +326,19 @@ export function CreateCoursePage() {
   };
 
   const handlePublish = async () => {
-    if (!validateStep()) return;
+    // Validate every step, not just the review step — the backend rejects
+    // incomplete courses with an opaque VALIDATION_ERROR.
+    for (let step = 0; step < STEPS.length - 1; step++) {
+      if (!validateStepAt(step, false)) {
+        setCurrentStep(step);
+        validateStepAt(step, true);
+        toast.error(`Complete "${STEPS[step].label}" before publishing`);
+        return;
+      }
+    }
     setPublishing(true);
     try {
-      let id = courseId;
-      if (!id) {
-        const result = await ngoApi.createCourse(formData);
-        id = result.course._id;
-      } else {
-        await ngoApi.updateCourse(id, formData);
-      }
+      const id = await persistCourse();
       await ngoApi.publishCourse(id);
       toast.success('Course published successfully!');
       navigate('/ngo/courses');
@@ -535,12 +544,12 @@ function CourseDetailsStep({ data, errors, updateField, updateNested }: StepProp
       </div>
 
       <div>
-        <label className="mb-1.5 block text-sm font-semibold text-ink-700">Tags (comma separated)</label>
-        <input
-          value={data.tags?.join(', ') || ''}
-          onChange={(e) => updateField('tags', e.target.value.split(',').map(t => t.trim()).filter(Boolean))}
+        <CommaSeparatedInput
+          label="Tags"
+          value={data.tags}
+          onChange={(next) => updateField('tags', next)}
           placeholder="e.g., Python, Data Science, Web Development"
-          className="w-full rounded-2xl border border-ink-200 bg-ink-50/60 px-4 py-3 text-sm text-ink-700 outline-none focus:border-teal-400 focus:ring-2 focus:ring-teal-100"
+          hint="Separate multiple tags with commas."
         />
       </div>
 
@@ -853,24 +862,18 @@ function EligibilityBenefitsStep({ data, updateNested, updateField }: StepProps)
       </div>
 
       <div className="grid gap-4 md:grid-cols-2">
-        <div>
-          <label className="mb-1.5 block text-sm font-semibold text-ink-700">Required Skills (comma separated)</label>
-          <input
-            value={data.eligibility?.requiredSkills?.join(', ') || ''}
-            onChange={(e) => updateNested('eligibility', 'requiredSkills', e.target.value.split(',').map(t => t.trim()).filter(Boolean))}
-            placeholder="e.g., Basic Computer, MS Office"
-            className="w-full rounded-xl border border-ink-200 bg-ink-50/60 px-4 py-3 text-sm text-ink-700 outline-none focus:border-teal-400"
-          />
-        </div>
-        <div>
-          <label className="mb-1.5 block text-sm font-semibold text-ink-700">Preferred Skills (comma separated)</label>
-          <input
-            value={data.eligibility?.preferredSkills?.join(', ') || ''}
-            onChange={(e) => updateNested('eligibility', 'preferredSkills', e.target.value.split(',').map(t => t.trim()).filter(Boolean))}
-            placeholder="e.g., Python, JavaScript"
-            className="w-full rounded-xl border border-ink-200 bg-ink-50/60 px-4 py-3 text-sm text-ink-700 outline-none focus:border-teal-400"
-          />
-        </div>
+        <CommaSeparatedInput
+          label="Required Skills"
+          value={data.eligibility?.requiredSkills}
+          onChange={(next) => updateNested('eligibility', 'requiredSkills', next)}
+          placeholder="e.g., Basic Computer, MS Office"
+        />
+        <CommaSeparatedInput
+          label="Preferred Skills"
+          value={data.eligibility?.preferredSkills}
+          onChange={(next) => updateNested('eligibility', 'preferredSkills', next)}
+          placeholder="e.g., Python, JavaScript"
+        />
       </div>
 
       <div className="grid gap-4 md:grid-cols-2">
@@ -1020,12 +1023,11 @@ function EligibilityBenefitsStep({ data, updateNested, updateField }: StepProps)
               placeholder="e.g., ₹3.5 LPA"
             />
             <div className="md:col-span-2">
-              <label className="mb-1.5 block text-sm font-semibold text-ink-700">Hiring Partners (comma separated)</label>
-              <input
-                value={data.placement?.hiringPartners?.join(', ') || ''}
-                onChange={(e) => updateNested('placement', 'hiringPartners', e.target.value.split(',').map(t => t.trim()).filter(Boolean))}
+              <CommaSeparatedInput
+                label="Hiring Partners"
+                value={data.placement?.hiringPartners}
+                onChange={(next) => updateNested('placement', 'hiringPartners', next)}
                 placeholder="e.g., TCS, Infosys, Wipro"
-                className="w-full rounded-xl border border-ink-200 bg-ink-50/60 px-4 py-3 text-sm text-ink-700 outline-none focus:border-teal-400"
               />
             </div>
           </div>

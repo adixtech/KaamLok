@@ -11,6 +11,7 @@ import type {
   CourseStatus,
   DocumentType,
   NGONotification,
+  StudentProfileDetail,
 } from '../types/ngo';
 
 /**
@@ -61,14 +62,14 @@ export const ngoApi = {
   async updateCourse(id: string, payload: Record<string, unknown>): Promise<{ course: Course; message: string }> {
     // Destructure and strip out system/read-only database fields that cause 400 Bad Request errors
     const { 
-      _id, 
-      id: temporaryId, // in case 'id' is also passed in payload
-      createdAt, 
-      updatedAt, 
-      __v, 
-      viewsCount, 
-      filledSeats, 
-      applicationsCount, 
+      _id: __id, 
+      id: _id, // in case 'id' is also passed in payload
+      createdAt: _createdAt, 
+      updatedAt: _updatedAt, 
+      __v: ___v, 
+      viewsCount: _viewsCount, 
+      filledSeats: _filledSeats, 
+      applicationsCount: _applicationsCount, 
       ...cleanPayload 
     } = payload;
 
@@ -130,6 +131,16 @@ export const ngoApi = {
     return data;
   },
 
+  /**
+   * Full student record for an applicant: account fields, the complete
+   * StudentProfile document, the application, and the course applied for.
+   * The backend scopes this to applications belonging to the signed-in NGO.
+   */
+  async getStudentProfile(applicationId: string): Promise<StudentProfileDetail> {
+    const { data } = await apiClient.get(`${BASE}/applications/${applicationId}/student`);
+    return data;
+  },
+
   async startReviewApplication(id: string, note?: string): Promise<{ message: string }> {
     const { data } = await apiClient.post(`${BASE}/applications/${id}/review`, { note });
     return data;
@@ -152,6 +163,17 @@ export const ngoApi = {
 
   async waitlistApplication(id: string, note?: string): Promise<{ message: string }> {
     const { data } = await apiClient.post(`${BASE}/applications/${id}/waitlist`, { note });
+    return data;
+  },
+
+  // ─── Messages ────────────────────────────────────────────────────
+  async sendStudentMessage(payload: {
+    recipientEmail: string;
+    subject: string;
+    body: string;
+    applicationId?: string;
+  }): Promise<{ message: string; notificationId: string; emailed: boolean }> {
+    const { data } = await apiClient.post(`${BASE}/messages`, payload);
     return data;
   },
 
@@ -243,6 +265,25 @@ export const ngoApi = {
     const { data } = await apiClient.delete(`${BASE}/notifications/${id}`);
     return data;
   },
+  // ─── Settings ────────────────────────────────────────────────────
+  async getSettings(): Promise<{
+    notificationSettings: Record<string, boolean>;
+    preferences: Record<string, string>;
+  }> {
+    const { data } = await apiClient.get(`${BASE}/settings`);
+    return data;
+  },
+
+  async updateNotificationSettings(settings: Record<string, boolean>): Promise<{ message: string }> {
+    const { data } = await apiClient.put(`${BASE}/settings/notifications`, settings);
+    return data;
+  },
+
+  async updatePreferences(preferences: Record<string, string>): Promise<{ message: string }> {
+    const { data } = await apiClient.put(`${BASE}/settings/preferences`, preferences);
+    return data;
+  },
+
   // ─── Public Routes ─────────────────────────────────────────────────────
   async getPublicCourses(params?: {
     page?: number;

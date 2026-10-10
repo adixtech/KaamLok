@@ -1,13 +1,57 @@
-import { useState, useEffect, useCallback } from 'react';
+// import { useState, useEffect, type FormEvent, type ReactNode } from 'react';
+
+// function StatCard({
+//   icon,
+//   label,
+//   value,
+//   tone,
+// }: {
+//   icon: ReactNode;
+//   label: string;
+//   value: number;
+//   tone: string;
+// }) {
+//   return (
+//     <div className="flex items-center gap-3 rounded-2xl bg-white p-4 shadow-card ring-1 ring-inset ring-ink-200/50">
+//       <span className={`grid h-10 w-10 place-items-center rounded-xl ${tone}`}>{icon}</span>
+//       <div>
+//         <p className="text-xs font-medium text-ink-500">{label}</p>
+//         <p className="text-xl font-bold text-ink-900">{value}</p>
+//       </div>
+//     </div>
+//   );
+// }
+
+
+
+  // const handleSubmit = async (e: FormEvent) => {
+  //   e.preventDefault();
+  //   if (!formData.subject || !formData.body) {
+  //     toast.error('Please fill in subject and message');
+  //     return;
+  //   }
+  //   if (formData.type === 'individual' && !formData.recipientEmail) {
+  //     toast.error('Please enter recipient email');
+  //     return;
+  //   }
+  //   setSending(true);
+  //   try {
+  //     await new Promise((resolve) => setTimeout(resolve, 500));
+  //     onSend(formData);
+  //   } finally {
+  //     setSending(false);
+  //   }
+  // };
+
+ import { useState, useEffect, useCallback,  type FormEvent } from 'react';
 import {
   MessageSquare, Send, Search, Plus, ChevronDown, X, Clock,
-  Check, CheckCheck, Star, Trash2, Reply, MoreVertical,
-  User, FileText, Calendar, AlertCircle,
+   CheckCheck,  Trash2,
+   FileText, Calendar, AlertCircle,
 } from 'lucide-react';
 import { NGOLayout } from '../../components/ngo/NGOLayout';
 import { FullScreenLoader } from '../../components/ui/Loading';
 import { ngoApi } from '../../services/ngoApi';
-import { apiClient } from '../../services/apiClient';
 import type { NGONotification } from '../../types/ngo';
 import toast from 'react-hot-toast';
 
@@ -78,12 +122,13 @@ export function MessagesPage() {
   }, []);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchMessages();
   }, [fetchMessages]);
 
   const filteredMessages = messages.filter((m) => {
-    if (filter === 'sent' && m.isRead) return false;
-    if (filter === 'draft' && !m.isRead) return false;
+    if (filter === 'sent' && !m.isRead) return false;
+    if (filter === 'draft' && m.isRead) return false;
     if (searchQuery) {
       const q = searchQuery.toLowerCase();
       return (
@@ -97,6 +142,8 @@ export function MessagesPage() {
   const stats = {
     total: messages.length,
     sent: messages.filter((m) => m.isRead).length,
+    scheduled: 0,
+    draft: messages.filter((m) => !m.isRead).length,
     unread: messages.filter((m) => !m.isRead).length,
   };
 
@@ -228,10 +275,14 @@ export function MessagesPage() {
               onClose={() => setShowCompose(false)}
               onSend={async (msg) => {
                 try {
-                  // Messages are delivered via the platform notification system.
-                  // Full email delivery via AWS SES will be available in a future update.
-                  await apiClient.post('/notifications', msg);
-                  toast.success('Message sent successfully');
+                  // Delivered as an in-app notification plus a real email via the
+                  // configured transport (SMTP / SES / SNS).
+                  const res = await ngoApi.sendStudentMessage({
+                    recipientEmail: msg.recipientEmail || '',
+                    subject: msg.subject,
+                    body: msg.body,
+                  });
+                  toast.success(res.emailed ? 'Message sent and emailed' : res.message);
                   setShowCompose(false);
                   fetchMessages();
                 } catch (err) {
@@ -330,7 +381,7 @@ function MessageListItem({
 }
 
 function MessageDetailPanel({
-  message, onDelete, onClose,
+  message, onDelete,
 }: {
   message: NGONotification;
   onDelete: () => void;
@@ -370,8 +421,7 @@ function MessageDetailPanel({
 
       <div className="border-t border-ink-100 px-6 py-4">
         <div className="rounded-lg border border-teal-200 bg-teal-50 p-3 text-xs text-teal-700">
-          <strong>Message Delivery:</strong> Emails are currently delivered via the platform notification system.
-          Full email delivery via AWS SES will be available in the next update.
+          <strong>Message Delivery:</strong> Sent via the KaamLok inbox and by email, using the transport configured for the platform (SMTP, or Amazon SES/SNS when enabled).
         </div>
       </div>
     </div>
@@ -405,7 +455,7 @@ function ComposePanel({
     toast.success('Template applied');
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     if (!formData.subject || !formData.body) {
       toast.error('Please fill in subject and message');

@@ -143,3 +143,81 @@ export const markAllNotificationsRead: RequestHandler = async (req, res, next) =
     res.json(result);
   } catch (err) { next(err); }
 };
+
+export const deleteNotification: RequestHandler = async (req, res, next) => {
+  try {
+    const user = getUser(req);
+    const result = await studentService.deleteNotification(user.id, req.params.id);
+    res.json(result);
+  } catch (err) { next(err); }
+};
+
+// ─── Certificates ─────────────────────────────────────────────
+export const getCertificates: RequestHandler = async (req, res, next) => {
+  try {
+    const user = getUser(req);
+    const certificates = await studentService.getCertificates(user.id);
+    res.json({ certificates });
+  } catch (err) { next(err); }
+};
+
+// ─── Success Stories ──────────────────────────────────────────
+export const submitSuccessStory: RequestHandler = async (req, res, next) => {
+  try {
+    const user = getUser(req);
+    const result = await studentService.submitSuccessStory(user.id, {
+      courseId: req.body.courseId,
+      beforeStory: req.body.beforeStory,
+      afterStory: req.body.afterStory,
+      quote: req.body.quote,
+      skillsLearned: req.body.skillsLearned,
+      currentRole: req.body.currentRole,
+      currentCompany: req.body.currentCompany,
+      currentSalary: req.body.currentSalary,
+    });
+    res.status(201).json(result);
+  } catch (err) { next(err); }
+};
+
+export const getMySuccessStories: RequestHandler = async (req, res, next) => {
+  try {
+    const user = getUser(req);
+    const result = await studentService.getMySuccessStories(user.id);
+    res.json(result);
+  } catch (err) { next(err); }
+};
+
+// ─── Timeline ─────────────────────────────────────────────────
+export const getTimeline: RequestHandler = async (req, res, next) => {
+  try {
+    const user = getUser(req);
+    const retentionDays = req.query.retentionDays ? Number(req.query.retentionDays) : undefined;
+    const result = await studentService.getTimeline(user.id, { retentionDays });
+    res.json(result);
+  } catch (err) { next(err); }
+};
+
+// ─── Settings ─────────────────────────────────────────────────
+export const getSettings: RequestHandler = async (req, res, next) => {
+  try {
+    const user = getUser(req);
+    const result = await studentService.getSettings(user.id);
+    res.json(result);
+  } catch (err) { next(err); }
+};
+
+export const updateNotificationSettings: RequestHandler = async (req, res, next) => {
+  try {
+    const user = getUser(req);
+    const result = await studentService.updateNotificationSettings(user.id, req.body || {});
+    res.json(result);
+  } catch (err) { next(err); }
+};
+
+export const updatePreferences: RequestHandler = async (req, res, next) => {
+  try {
+    const user = getUser(req);
+    const result = await studentService.updatePreferences(user.id, req.body || {});
+    res.json(result);
+  } catch (err) { next(err); }
+};

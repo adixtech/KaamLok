@@ -4,7 +4,8 @@ import { ChevronDown } from 'lucide-react';
 import { AdminLayout } from '../../components/admin/AdminLayout';
 import { AdminTable } from '../../components/admin/AdminTable';
 import { AdminPagination } from '../../components/admin/AdminPagination';
-import { AdminBadge, statusTone } from '../../components/admin/AdminBadge';
+import { AdminBadge } from '../../components/admin/AdminBadge';
+import { statusTone } from '../../utils/adminStatus';
 import { AdminModal } from '../../components/admin/AdminModal';
 import { AdminButton } from '../../components/admin/AdminButton';
 import { ErrorState } from '../../components/admin/AdminLoading';
@@ -40,7 +41,10 @@ export function ApplicationManagementPage() {
     }
   }, [page, status]);
 
-  useEffect(() => { fetchApplications(); }, [fetchApplications]);
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    fetchApplications();
+  }, [fetchApplications]);
 
   const openStatusModal = (app: ApplicationItem) => {
     setEditApp(app);

@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Menu, Search, Bell, ChevronDown, LogOut, User, Settings } from 'lucide-react';
-import { useAuth } from '../../context/AuthContext';
+import { useAuth } from '../../context/useAuth';
 import { studentApi } from '../../services/studentApi';
 
 export function StudentNavbar({ onMenuClick }: { onMenuClick: () => void }) {

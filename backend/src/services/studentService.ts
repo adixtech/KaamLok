@@ -116,13 +116,14 @@
 //     };
 //   },
 // };
-
 import { Course } from '../models/Course';
-import { Application, type IApplication } from '../models/Application';
+import { Application, type IApplication, type ApplicationStatus } from '../models/Application';
 import { StudentProfile, type IStudentProfile } from '../models/StudentProfile';
 import { SavedCourse } from '../models/SavedCourse';
 import { NGOProfile } from '../models/NGOProfile';
 import { User } from '../models/User';
+import { Certificate } from '../models/Certificate';
+import { SuccessStory } from '../models/SuccessStory';
 import { ApiError } from '../utils/errors';
 
 /**
@@ -192,6 +193,12 @@ export const studentService = {
     const course = await Course.findOne({ _id: courseId, isPublished: true, status: 'published' });
     if (!course) throw new ApiError(404, 'Course not found or not available', 'COURSE_NOT_FOUND');
 
+    // Verify the NGO owning this course is still verified + active
+    const ngoUser = await User.findById(course.ngoId).select('role status');
+    if (!ngoUser || ngoUser.role !== 'ngo' || ngoUser.status !== 'active') {
+      throw new ApiError(403, 'This organization is not currently accepting applications', 'NGO_UNAVAILABLE');
+    }
+
     if (new Date() > course.schedule.applicationEnd) {
       throw new ApiError(400, 'Applications for this course have closed', 'APPLICATIONS_CLOSED');
     }
@@ -255,16 +262,9 @@ export const studentService = {
     if (!['pending', 'under_review'].includes(app.status)) {
       throw new ApiError(400, 'Cannot withdraw application at this stage', 'CANNOT_WITHDRAW');
     }
-
-    // Ensure the Application model pre-save hook can populate required `changedBy`
-    // and avoid manually pushing an incomplete statusHistory entry.
-    (app as unknown as { $locals?: Record<string, unknown> }).$locals = {
-      ...(app as unknown as { $locals?: Record<string, unknown> }).$locals,
-      changedBy: studentId,
-      statusNote: 'Withdrawn by student',
-    };
-
     app.status = 'withdrawn';
+    app.$locals.changedBy = studentId;
+    app.$locals.statusNote = 'Withdrawn by student';
     await app.save();
     return { message: 'Application withdrawn successfully' };
   },
@@ -501,7 +501,13 @@ export const studentService = {
     const { page = 1, limit = 12, search, state } = params;
     const skip = (page - 1) * limit;
 
-    const query: Record<string, unknown> = { verificationStatus: 'approved' };
+    // Same canonical filter as publicService: approved + active user
+    const activeUsers = await User.find({ role: 'ngo', status: 'active' }).select('_id').lean();
+    const userIds = activeUsers.map((u) => u._id);
+    const query: Record<string, unknown> = {
+      verificationStatus: 'approved',
+      user: { $in: userIds },
+    };
     if (state) query.state = state;
     if (search) {
       query.$or = [
@@ -516,7 +522,10 @@ export const studentService = {
         .sort({ studentsTrained: -1, createdAt: -1 })
         .skip(skip)
         .limit(limit)
-        .select('ngoName slug logo coverImage description city state studentsTrained sectorsFocused establishedYear socialLinks'),
+        // `user` is required: the per-NGO active-course count below filters on
+        // it. Without it the filter becomes { ngoId: undefined }, which matches
+        // every published course platform-wide.
+        .select('user ngoName slug logo coverImage description city state studentsTrained sectorsFocused establishedYear socialLinks'),
       NGOProfile.countDocuments(query),
     ]);
 
@@ -591,5 +600,198 @@ export const studentService = {
     await notifModel.updateMany({ recipientId: studentId, isRead: false }, { isRead: true });
     return { message: 'All notifications marked as read' };
   },
-};
 
+  async deleteNotification(studentId: string, notificationId: string) {
+    const notifModel = (await import('../models/Notification')).Notification;
+    await notifModel.deleteOne({ _id: notificationId, recipientId: studentId });
+    return { message: 'Notification deleted' };
+  },
+
+  // ─── Certificates ─────────────────────────────────────────────
+  async getCertificates(studentId: string) {
+    const certificates = await Certificate.find({ studentId, status: 'issued' })
+      .sort({ issueDate: -1 })
+      .populate('courseId', 'title slug thumbnail category mode ngoName ngoLogo')
+      .lean();
+
+    return certificates.map((c) => ({
+      _id: c._id.toString(),
+      certificateNumber: c.certificateNumber,
+      courseTitle: c.courseTitle,
+      issueDate: c.issueDate.toISOString(),
+      grade: c.grade,
+      skillsAcquired: c.skillsAcquired,
+      ngoName: c.ngoName,
+      course: c.courseId,
+    }));
+  },
+
+  // ─── Success Stories ──────────────────────────────────────────
+  async submitSuccessStory(
+    studentId: string,
+    data: {
+      courseId: string;
+      beforeStory: string;
+      afterStory: string;
+      quote: string;
+      skillsLearned?: string[];
+      currentRole?: string;
+      currentCompany?: string;
+      currentSalary?: string;
+    }
+  ) {
+    // Verify the student was selected for this course (completed training)
+    const application = await Application.findOne({
+      studentId,
+      courseId: data.courseId,
+      status: 'selected',
+    }).populate('courseId', 'title').populate('ngoId', 'firstName ngoName');
+
+    if (!application) {
+      throw new ApiError(403, 'You can only submit a story for a course you have been selected for', 'NOT_ELIGIBLE');
+    }
+
+    const course = application.courseId as unknown as { title: string };
+    const ngo = application.ngoId as unknown as { _id: string; ngoName: string; firstName: string };
+
+    const user = await User.findById(studentId);
+    if (!user) throw new ApiError(404, 'User not found', 'NOT_FOUND');
+    const studentName = `${user.firstName} ${user.lastName || ''}`.trim();
+
+    // Check for duplicate story
+    const existing = await SuccessStory.findOne({ studentName, courseId: data.courseId });
+    if (existing) {
+      throw new ApiError(409, 'You have already submitted a success story for this course', 'DUPLICATE_STORY');
+    }
+    const profile = await StudentProfile.findOne({ user: studentId });
+
+    const story = await SuccessStory.create({
+      studentName,
+      studentPhoto: profile?.photo,
+      studentCity: profile?.city,
+      ngoId: ngo._id,
+      ngoName: ngo.ngoName || ngo.firstName,
+      courseId: data.courseId,
+      courseTitle: course.title,
+      skillsLearned: data.skillsLearned || [],
+      currentRole: data.currentRole,
+      currentCompany: data.currentCompany,
+      currentSalary: data.currentSalary,
+      beforeStory: data.beforeStory,
+      afterStory: data.afterStory,
+      quote: data.quote,
+      completionDate: new Date(),
+      isPublished: false,
+      isFeatured: false,
+    });
+
+    return { story: { _id: story._id.toString(), message: 'Success story submitted for review' } };
+  },
+
+  async getMySuccessStories(studentId: string) {
+    const user = await User.findById(studentId);
+    if (!user) return { stories: [] };
+    const studentName = `${user.firstName} ${user.lastName || ''}`.trim();
+    const stories = await SuccessStory.find({ studentName })
+      .sort({ createdAt: -1 })
+      .select('courseTitle ngoName isPublished isFeatured createdAt completionDate');
+    return {
+      stories: stories.map((s) => ({
+        _id: s._id.toString(),
+        courseTitle: s.courseTitle,
+        ngoName: s.ngoName,
+        isPublished: s.isPublished,
+        isFeatured: s.isFeatured,
+        createdAt: s.createdAt.toISOString(),
+        completionDate: s.completionDate?.toISOString(),
+      })),
+    };
+  },
+
+  // ─── Timeline ─────────────────────────────────────────────────
+  async getTimeline(studentId: string, params: { retentionDays?: number }) {
+    const retentionDays = params.retentionDays ?? 90;
+    const cutoffDate = new Date(Date.now() - retentionDays * 24 * 60 * 60 * 1000);
+
+    // Timeline events are derived from application status history (temporary dashboard activity)
+    // Only show events within the retention period — older events are archived (not shown)
+    // Core application records are NOT deleted
+    const applications = await Application.find({
+      studentId,
+      updatedAt: { $gte: cutoffDate },
+    })
+      .sort({ updatedAt: -1 })
+      .limit(20)
+      .populate('courseId', 'title slug thumbnail category ngoName ngoLogo')
+      .select('status statusHistory createdAt updatedAt courseId');
+
+    const events: Array<{
+      _id: string;
+      type: string;
+      status: string;
+      courseTitle: string;
+      course?: unknown;
+      timestamp: string;
+    }> = [];
+
+    for (const app of applications) {
+      const course = app.courseId as unknown as { title?: string; slug?: string; thumbnail?: string; category?: string; ngoName?: string; ngoLogo?: string };
+      for (const history of app.statusHistory) {
+        if (new Date(history.changedAt) < cutoffDate) continue;
+        events.push({
+          _id: `${app._id}-${history.status}-${history.changedAt.getTime()}`,
+          type: 'status_change',
+          status: history.status,
+          courseTitle: course?.title || 'Unknown Course',
+          course,
+          timestamp: history.changedAt.toISOString(),
+        });
+      }
+    }
+
+    events.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+
+    return {
+      events: events.slice(0, 20),
+      retentionDays,
+      archivedCount: 0,
+    };
+  },
+
+  // ─── Settings ─────────────────────────────────────────────────
+  async getSettings(studentId: string) {
+    const profile = await StudentProfile.findOne({ user: studentId });
+    return {
+      notificationSettings: (profile as unknown as { notificationSettings?: Record<string, boolean> })?.notificationSettings || {
+        emailNotifications: true,
+        applicationUpdates: true,
+        interviewReminders: true,
+        courseRecommendations: true,
+        marketingEmails: false,
+      },
+      preferences: (profile as unknown as { preferences?: Record<string, string> })?.preferences || {
+        language: 'en',
+        timezone: 'Asia/Kolkata',
+        dateFormat: 'DD/MM/YYYY',
+      },
+    };
+  },
+
+  async updateNotificationSettings(studentId: string, settings: Record<string, boolean>) {
+    await StudentProfile.findOneAndUpdate(
+      { user: studentId },
+      { $set: { notificationSettings: settings } },
+      { new: true, upsert: true }
+    );
+    return { message: 'Notification preferences saved' };
+  },
+
+  async updatePreferences(studentId: string, preferences: Record<string, string>) {
+    await StudentProfile.findOneAndUpdate(
+      { user: studentId },
+      { $set: { preferences } },
+      { new: true, upsert: true }
+    );
+    return { message: 'Preferences saved' };
+  },
+};

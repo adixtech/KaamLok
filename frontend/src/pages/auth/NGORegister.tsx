@@ -9,7 +9,7 @@ import { PasswordStrength } from '../../components/ui/PasswordStrength';
 import { Checkbox } from '../../components/ui/Checkbox';
 import { Button } from '../../components/ui/Button';
 import { Spinner } from '../../components/ui/Loading';
-import { useAuth } from '../../context/AuthContext';
+import { useAuth } from '../../context/useAuth';
 import type { NGORegisterPayload } from '../../types/auth';
 
 type RegisterForm = NGORegisterPayload & { confirmPassword: string };

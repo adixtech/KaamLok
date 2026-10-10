@@ -6,6 +6,9 @@ import type {
   SavedCourseItem,
   DirectoryNGO,
   StudentNotification,
+  CertificateItem,
+  MySuccessStory,
+  TimelineEvent,
 } from '../types/student';
 import type { Pagination } from '../types/ngo';
 import type { StudentApplication } from '../types/public';
@@ -131,6 +134,60 @@ export const studentApi = {
 
   async markAllNotificationsRead(): Promise<{ message: string }> {
     const { data } = await apiClient.patch(`${S}/notifications/mark-all-read`);
+    return data;
+  },
+
+  // ─── Certificates ─────────────────────────────────────────────
+  async getCertificates(): Promise<{ certificates: CertificateItem[] }> {
+    const { data } = await apiClient.get('/student/certificates');
+    return data;
+  },
+
+  // ─── Success Stories ──────────────────────────────────────────
+  async submitSuccessStory(payload: {
+    courseId: string;
+    beforeStory: string;
+    afterStory: string;
+    quote: string;
+    skillsLearned?: string[];
+    currentRole?: string;
+    currentCompany?: string;
+    currentSalary?: string;
+  }): Promise<{ story: { _id: string; message: string } }> {
+    const { data } = await apiClient.post('/student/success-stories', payload);
+    return data;
+  },
+
+  async getMySuccessStories(): Promise<{ stories: MySuccessStory[] }> {
+    const { data } = await apiClient.get('/student/success-stories');
+    return data;
+  },
+
+  // ─── Timeline ─────────────────────────────────────────────────
+  async getTimeline(retentionDays?: number): Promise<{ events: TimelineEvent[]; retentionDays: number; archivedCount: number }> {
+    const { data } = await apiClient.get('/student/timeline', { params: { retentionDays } });
+    return data;
+  },
+
+  // ─── Settings ──────────────────────────────────────────────────
+  async getSettings(): Promise<{ notificationSettings: Record<string, boolean>; preferences: Record<string, string> }> {
+    const { data } = await apiClient.get('/student/settings');
+    return data;
+  },
+
+  async updateNotificationSettings(settings: Record<string, boolean>): Promise<{ message: string }> {
+    const { data } = await apiClient.put('/student/settings/notifications', settings);
+    return data;
+  },
+
+  async updatePreferences(preferences: Record<string, string>): Promise<{ message: string }> {
+    const { data } = await apiClient.put('/student/settings/preferences', preferences);
+    return data;
+  },
+
+  // ─── Notification Delete ───────────────────────────────────────
+  async deleteNotification(id: string): Promise<{ message: string }> {
+    const { data } = await apiClient.delete(`/student/notifications/${id}`);
     return data;
   },
 };

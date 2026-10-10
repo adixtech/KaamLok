@@ -6,7 +6,8 @@ import {
 import { AdminLayout } from '../../components/admin/AdminLayout';
 import { AdminTable } from '../../components/admin/AdminTable';
 import { AdminPagination } from '../../components/admin/AdminPagination';
-import { AdminBadge, statusTone } from '../../components/admin/AdminBadge';
+import { AdminBadge } from '../../components/admin/AdminBadge';
+import { statusTone } from '../../utils/adminStatus';
 import { AdminButton } from '../../components/admin/AdminButton';
 import { AdminModal } from '../../components/admin/AdminModal';
 import { ErrorState } from '../../components/admin/AdminLoading';
@@ -22,7 +23,7 @@ type Action =
   | { type: 'requestDocs'; ngo: NGOListItem }
   | null;
 
-const STATUSES = ['', 'pending', 'approved', 'rejected', 'suspended'];
+const STATUSES = ['', 'pending', 'active'];
 
 export function NGOManagementPage() {
   const [ngos, setNgos] = useState<NGOListItem[]>([]);
@@ -52,7 +53,10 @@ export function NGOManagementPage() {
     }
   }, [page, search, status]);
 
-  useEffect(() => { fetchNgos(); }, [fetchNgos]);
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    fetchNgos();
+  }, [fetchNgos]);
 
   const applySearch = () => { setPage(1); fetchNgos(); };
   const closeAction = () => { setAction(null); setReason(''); setDocMessage(''); };

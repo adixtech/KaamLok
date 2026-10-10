@@ -127,6 +127,13 @@ const approveNGO: RequestHandler = async (req, res, next) => {
     user.status = 'active';
     await user.save();
 
+    // Keep NGOProfile.verificationStatus in sync with User.verificationStatus.
+    // The public directory and public NGO profile pages filter on
+    // NGOProfile.verificationStatus === 'approved'; without this sync the
+    // super-admin UI reports "approved" while the public directory stays empty
+    // even though the same NGOs can already log in.
+    await NGOProfile.updateOne({ user: user._id }, { $set: { verificationStatus: 'approved' } });
+
     await logAudit(req.admin.id, 'ngo_approve', 'ngo', user._id.toString(), user.firstName, 'NGO approved', getIp(req));
     await Notification.create({
       recipientId: null,
@@ -149,6 +156,8 @@ const rejectNGO: RequestHandler = async (req, res, next) => {
     if (!user || user.role !== 'ngo') throw new ApiError(404, 'NGO not found', 'NOT_FOUND');
     user.verificationStatus = 'rejected';
     await user.save();
+    // Keep the public-facing profile status in sync with the user record.
+    await NGOProfile.updateOne({ user: user._id }, { $set: { verificationStatus: 'rejected' } });
 
     await logAudit(req.admin.id, 'ngo_reject', 'ngo', user._id.toString(), user.firstName, req.body.reason || 'NGO rejected', getIp(req));
     await Notification.create({

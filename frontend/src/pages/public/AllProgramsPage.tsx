@@ -51,6 +51,7 @@ export function AllProgramsPage() {
   }, [page, search, category, mode, state]);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchCourses();
   }, [fetchCourses]);
 
@@ -244,8 +245,8 @@ export function AllProgramsPage() {
           {!loading && !error && courses.length > 0 && (
             <>
               <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-                {courses.map((c, i) => (
-                  <CourseCard key={c._id} course={c} index={i} />
+                {courses.map((c) => (
+                  <CourseCard key={c._id} course={c} />
                 ))}
               </div>
 

@@ -4,7 +4,7 @@ import { Toaster } from 'react-hot-toast';
 import { AuthProvider } from './context/AuthContext';
 import { ProtectedRoute, RoleRoute, PublicOnlyRoute } from './components/auth/ProtectedRoute';
 import { FullScreenLoader } from './components/ui/Loading';
-import { useAuth } from './context/AuthContext';
+import { useAuth } from './context/useAuth';
 
 import { LandingPage } from './pages/LandingPage';
 //add by me for course page to ngo integration 5 lines

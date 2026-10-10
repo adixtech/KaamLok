@@ -40,6 +40,7 @@ export function NGOAnalyticsPage() {
   }, [period]);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchData();
   }, [fetchData]);
 
@@ -63,7 +64,7 @@ export function NGOAnalyticsPage() {
       URL.revokeObjectURL(link.href);
 
       toast.success('Analytics exported to CSV');
-    } catch (err) {
+    } catch {
       toast.error('Failed to export');
     } finally {
       setExporting(false);

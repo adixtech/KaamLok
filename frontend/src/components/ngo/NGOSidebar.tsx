@@ -4,7 +4,7 @@ import {
   BarChart3, Building2, FileText, Bell, Settings, ChevronLeft,
 } from 'lucide-react';
 import { Logo } from '../Logo';
-import { useAuth } from '../../context/AuthContext';
+import { useAuth } from '../../context/useAuth';
 
 type NavItem = {
   to: string;

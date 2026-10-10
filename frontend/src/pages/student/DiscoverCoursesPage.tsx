@@ -53,15 +53,18 @@ export function DiscoverCoursesPage() {
     }
   }, [page, search, category, mode, state]);
 
-  useEffect(() => { fetchCourses(); }, [fetchCourses]);
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    fetchCourses();
+  }, [fetchCourses]);
 
   useEffect(() => {
-    publicApi.getCourseFilters().then(setFilters).catch(() => {});
+    void publicApi.getCourseFilters().then(setFilters).catch(() => {});
   }, []);
 
   const updateFilter = (key: string, value: string) => {
     const p = new URLSearchParams(searchParams);
-    value ? p.set(key, value) : p.delete(key);
+    if (value) p.set(key, value); else p.delete(key);
     setSearchParams(p);
     setPage(1);
   };

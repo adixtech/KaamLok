@@ -1,29 +1,10 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { authService } from '../services/authService';
-import type { AuthUser, LoginPayload, NGORegisterPayload, StudentRegisterPayload, Role } from '../types/auth';
+import type { AuthUser, LoginPayload, NGORegisterPayload, StudentRegisterPayload } from '../types/auth';
+import { AuthContext } from './AuthContextValue';
+import type { AuthContextValue } from './AuthContextValue';
 
 type ApiError = { message: string; code?: string; field?: string; status?: number };
-
-type AuthContextValue = {
-  user: AuthUser | null;
-  loading: boolean;
-  error: string | null;
-  isAuthenticated: boolean;
-  role: Role | null;
-  isStudent: boolean;
-  isNGO: boolean;
-  isAdmin: boolean;
-  login: (payload: LoginPayload) => Promise<AuthUser>;
-  registerStudent: (payload: StudentRegisterPayload) => Promise<{ message: string; email: string }>;
-  registerNGO: (payload: NGORegisterPayload) => Promise<{ message: string; email: string }>;
-  verifyOTP: (email: string, otp: string) => Promise<AuthUser>;
-  resendOTP: (email: string) => Promise<void>;
-  logout: () => Promise<void>;
-  refresh: () => Promise<void>;
-  clearError: () => void;
-};
-
-const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
 /**
  * AuthProvider wraps the app and exposes a stable authentication API.
@@ -178,15 +159,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
-}
-
-/**
- * Access the auth context. Throws if used outside AuthProvider.
- */
-export function useAuth(): AuthContextValue {
-  const ctx = useContext(AuthContext);
-  if (!ctx) throw new Error('useAuth must be used within an AuthProvider');
-  return ctx;
 }
 
 export type { ApiError };

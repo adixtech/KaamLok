@@ -252,6 +252,22 @@ export const getStudentProfile: RequestHandler = async (req, res, next) => {
   }
 };
 
+// ─── Messages ─────────────────────────────────────────────────
+export const sendStudentMessage: RequestHandler = async (req, res, next) => {
+  try {
+    if (!req.user) throw new ApiError(401, 'Authentication required', 'UNAUTHORIZED');
+    const result = await ngoService.sendStudentMessage(req.user.id, {
+      recipientEmail: req.body.recipientEmail,
+      subject: req.body.subject,
+      body: req.body.body,
+      applicationId: req.body.applicationId,
+    });
+    res.status(201).json(result);
+  } catch (err) {
+    next(err);
+  }
+};
+
 // ─── Interviews ──────────────────────────────────────────────────
 export const scheduleInterview: RequestHandler = async (req, res, next) => {
   try {
@@ -439,6 +455,121 @@ export const getPublicCourseBySlug: RequestHandler = async (req, res, next) => {
 export const getCourseFilters: RequestHandler = async (_req, res, next) => {
   try {
     const result = await ngoService.getCourseFilters();
+    res.json(result);
+  } catch (err) {
+    next(err);
+  }
+};
+
+
+export const getSettings: RequestHandler = async (req, res, next) => {
+  try {
+    if (!req.user) {
+      throw new ApiError(401, 'Authentication required', 'UNAUTHORIZED');
+    }
+
+    const result = await ngoService.getSettings(req.user.id);
+    res.json(result);
+  } catch (err) {
+    next(err);
+  }
+};
+
+export const updateNotificationSettings: RequestHandler = async (
+  req,
+  res,
+  next
+) => {
+  try {
+    if (!req.user) {
+      throw new ApiError(401, 'Authentication required', 'UNAUTHORIZED');
+    }
+
+    const result = await ngoService.updateNotificationSettings(
+      req.user.id,
+      req.body
+    );
+
+    res.json(result);
+  } catch (err) {
+    next(err);
+  }
+};
+
+export const updatePreferences: RequestHandler = async (
+  req,
+  res,
+  next
+) => {
+  try {
+    if (!req.user) {
+      throw new ApiError(401, 'Authentication required', 'UNAUTHORIZED');
+    }
+
+    const result = await ngoService.updatePreferences(
+      req.user.id,
+      req.body
+    );
+
+    res.json(result);
+  } catch (err) {
+    next(err);
+  }
+};
+
+export const getPendingSuccessStories: RequestHandler = async (
+  req,
+  res,
+  next
+) => {
+  try {
+    if (!req.user) {
+      throw new ApiError(401, 'Authentication required', 'UNAUTHORIZED');
+    }
+
+    const result = await ngoService.getPendingSuccessStories(req.user.id);
+    res.json(result);
+  } catch (err) {
+    next(err);
+  }
+};
+
+export const approveSuccessStory: RequestHandler = async (
+  req,
+  res,
+  next
+) => {
+  try {
+    if (!req.user) {
+      throw new ApiError(401, 'Authentication required', 'UNAUTHORIZED');
+    }
+
+    const result = await ngoService.approveSuccessStory(
+      req.user.id,
+      req.params.id
+    );
+
+    res.json(result);
+  } catch (err) {
+    next(err);
+  }
+};
+
+export const rejectSuccessStory: RequestHandler = async (
+  req,
+  res,
+  next
+) => {
+  try {
+    if (!req.user) {
+      throw new ApiError(401, 'Authentication required', 'UNAUTHORIZED');
+    }
+
+    const result = await ngoService.rejectSuccessStory(
+      req.user.id,
+      req.params.id
+    );
+
     res.json(result);
   } catch (err) {
     next(err);

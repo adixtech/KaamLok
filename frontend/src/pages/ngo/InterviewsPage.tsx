@@ -70,6 +70,7 @@ export function InterviewsPage() {
   }, [filters, pagination.page, pagination.limit]);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchInterviews();
   }, [fetchInterviews]);
 

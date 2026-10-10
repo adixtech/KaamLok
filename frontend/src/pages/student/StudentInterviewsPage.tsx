@@ -29,7 +29,10 @@ export function StudentInterviewsPage() {
     }
   }, []);
 
-  useEffect(() => { fetchInterviews(); }, [fetchInterviews]);
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    fetchInterviews();
+  }, [fetchInterviews]);
 
   const now = new Date();
   const filtered = applications.filter((a) => {

@@ -173,6 +173,7 @@ export interface DirectoryNGO {
   sectorsFocused: string[];
   establishedYear?: number;
   activeCourses: number;
+  verificationStatus?: string;
 }
 
 export interface StudentNotification {
@@ -184,4 +185,43 @@ export interface StudentNotification {
   link?: string;
   metadata?: Record<string, unknown>;
   createdAt?: string;
+}
+
+export interface CertificateItem {
+  _id: string;
+  certificateNumber: string;
+  courseTitle: string;
+  issueDate: string;
+  grade?: string;
+  skillsAcquired: string[];
+  ngoName: string;
+  course?: {
+    _id: string;
+    title: string;
+    slug: string;
+    thumbnail?: string;
+    category?: string;
+    mode?: string;
+    ngoName?: string;
+    ngoLogo?: string;
+  };
+}
+
+export interface MySuccessStory {
+  _id: string;
+  courseTitle: string;
+  ngoName: string;
+  isPublished: boolean;
+  isFeatured: boolean;
+  createdAt: string;
+  completionDate?: string;
+}
+
+export interface TimelineEvent {
+  _id: string;
+  type: string;
+  status: string;
+  courseTitle: string;
+  course?: unknown;
+  timestamp: string;
 }

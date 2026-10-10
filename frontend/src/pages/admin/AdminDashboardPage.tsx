@@ -6,7 +6,8 @@ import {
 } from 'lucide-react';
 import { AdminLayout } from '../../components/admin/AdminLayout';
 import { StatCard } from '../../components/admin/StatCard';
-import { AdminBadge, statusTone } from '../../components/admin/AdminBadge';
+import { AdminBadge } from '../../components/admin/AdminBadge';
+import { statusTone } from '../../utils/adminStatus';
 import { AdminSkeleton, ErrorState } from '../../components/admin/AdminLoading';
 import { adminApi } from '../../services/adminApi';
 import type { DashboardStats } from '../../types/admin';
@@ -66,9 +67,9 @@ export function AdminDashboardPage() {
         <h2 className="mb-3 text-sm font-bold uppercase tracking-wider text-ink-400">NGOs</h2>
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <StatCard icon={<Building2 className="h-5 w-5" />} label="Total NGOs" value={stats.ngos.total} tone="bg-teal-50 text-teal-600" />
-          <StatCard icon={<Clock className="h-5 w-5" />} label="Pending Approval" value={stats.ngos.pending} tone="bg-amber-50 text-amber-600" />
+          <StatCard icon={<Clock className="h-5 w-5" />} label="Pending" value={stats.ngos.pending} tone="bg-amber-50 text-amber-600" />
           <StatCard icon={<CheckCircle2 className="h-5 w-5" />} label="Approved" value={stats.ngos.approved} tone="bg-emerald-50 text-emerald-600" />
-          <StatCard icon={<Ban className="h-5 w-5" />} label="Blocked" value={stats.ngos.blocked} tone="bg-rose-50 text-rose-600" />
+          <StatCard icon={<Ban className="h-5 w-5" />} label="Rejected" value={stats.ngos.rejected} tone="bg-rose-50 text-rose-600" />
         </div>
       </div>
 

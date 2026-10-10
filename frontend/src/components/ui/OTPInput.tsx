@@ -18,7 +18,12 @@ export function OTPInput({ length = 6, value, onChange, disabled, error }: Props
   const refs = useRef<(HTMLInputElement | null)[]>([]);
 
   useEffect(() => {
-    setDigits(value.split('').concat(Array(length).fill('')).slice(0, length));
+    let active = true;
+    (async () => {
+      const computeDigits = () => value.split('').concat(Array(length).fill('')).slice(0, length);
+      if (active) setDigits(computeDigits());
+    })();
+    return () => { active = false; };
   }, [value, length]);
 
   const emit = (next: string[]) => {

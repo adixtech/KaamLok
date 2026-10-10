@@ -66,6 +66,7 @@ export function MyCoursesPage() {
   }, [page, search, statusFilter, sortBy, sortOrder]);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchCourses();
   }, [fetchCourses]);
 

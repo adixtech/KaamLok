@@ -1,6 +1,6 @@
-- [ ] Update `frontend/src/App.tsx` to add missing public routes for imported public pages (AllProgramsPage, CourseDetailsPage, NGOPublicProfilePage, SuccessStoriesPage, ContactSupportPage).
-- [ ] Update `frontend/src/components/public/CourseCard.tsx` to remove unused `index` prop.
-- [ ] Update `frontend/src/pages/public/AllProgramsPage.tsx` to remove unused `FinalCTA` import.
-- [ ] Update `frontend/src/pages/public/CourseDetailsPage.tsx` to remove unused `user` and `appLoading` state.
-- [ ] Update `frontend/src/pages/public/NGOPublicProfilePage.tsx` to remove unsupported `lucide-react` social icon imports (Linkedin/Twitter/Facebook/Instagram/Youtube) and remove unused `LOGO_PLACEHOLDER`.
-- [ ] Run `npm run build` in `frontend/` and confirm it passes.
+- [x] Update `frontend/src/App.tsx` to add missing public routes for imported public pages (AllProgramsPage, CourseDetailsPage, NGOPublicProfilePage, SuccessStoriesPage, ContactSupportPage).
+- [x] Update `frontend/src/components/public/CourseCard.tsx` to remove unused `index` prop.
+- [x] Update `frontend/src/pages/public/AllProgramsPage.tsx` to remove unused `FinalCTA` import.
+- [x] Update `frontend/src/pages/public/CourseDetailsPage.tsx` to remove unused `user` and `appLoading` state.
+- [x] Update `frontend/src/pages/public/NGOPublicProfilePage.tsx` to remove unsupported `lucide-react` social icon imports (Linkedin/Twitter/Facebook/Instagram/Youtube) and remove unused `LOGO_PLACEHOLDER`.
+- [x] Run `npm run build` in `frontend/` and confirm it passes.

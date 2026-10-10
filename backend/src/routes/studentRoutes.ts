@@ -28,8 +28,26 @@ router.delete('/saved-courses/:courseId', ...student, ctrl.unsaveCourse);
 router.get('/ngos', ...student, ctrl.getNGODirectory);
 
 // ─── Notifications ────────────────────────────────────────────────
+// Order matters: the static `mark-all-read` must be declared before the
+// `:id` sibling would ever capture it (same method, one segment fewer).
 router.get('/notifications', ...student, ctrl.getNotifications);
-router.patch('/notifications/:id/read', ...student, ctrl.markNotificationRead);
 router.patch('/notifications/mark-all-read', ...student, ctrl.markAllNotificationsRead);
+router.patch('/notifications/:id/read', ...student, ctrl.markNotificationRead);
+router.delete('/notifications/:id', ...student, ctrl.deleteNotification);
+
+// ─── Certificates ─────────────────────────────────────────────────
+router.get('/certificates', ...student, ctrl.getCertificates);
+
+// ─── Success Stories ──────────────────────────────────────────────
+router.get('/success-stories', ...student, ctrl.getMySuccessStories);
+router.post('/success-stories', ...student, ctrl.submitSuccessStory);
+
+// ─── Timeline ─────────────────────────────────────────────────────
+router.get('/timeline', ...student, ctrl.getTimeline);
+
+// ─── Settings ─────────────────────────────────────────────────────
+router.get('/settings', ...student, ctrl.getSettings);
+router.put('/settings/notifications', ...student, ctrl.updateNotificationSettings);
+router.put('/settings/preferences', ...student, ctrl.updatePreferences);
 
 export default router;

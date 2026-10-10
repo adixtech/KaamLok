@@ -6,12 +6,13 @@ import {
 import { AdminLayout } from '../../components/admin/AdminLayout';
 import { AdminTable } from '../../components/admin/AdminTable';
 import { AdminPagination } from '../../components/admin/AdminPagination';
-import { AdminBadge, statusTone } from '../../components/admin/AdminBadge';
+import { AdminBadge } from '../../components/admin/AdminBadge';
+import { statusTone } from '../../utils/adminStatus';
 import { AdminButton } from '../../components/admin/AdminButton';
 import { AdminModal } from '../../components/admin/AdminModal';
 import { ErrorState } from '../../components/admin/AdminLoading';
 import { adminApi } from '../../services/adminApi';
-import { useAuth } from '../../context/AuthContext';
+import { useAuth } from '../../context/useAuth';
 import type { AdminUser, AdminRole, Pagination } from '../../types/admin';
 import { ADMIN_ROLE_LABELS } from '../../types/admin';
 
@@ -55,7 +56,10 @@ export function AdminManagementPage() {
     }
   }, [page]);
 
-  useEffect(() => { fetchAdmins(); }, [fetchAdmins]);
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    fetchAdmins();
+  }, [fetchAdmins]);
 
   const openCreate = () => {
     setEditAdmin(null);

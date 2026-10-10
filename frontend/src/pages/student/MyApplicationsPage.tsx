@@ -53,7 +53,10 @@ export function MyApplicationsPage() {
     }
   }, [page, statusFilter]);
 
-  useEffect(() => { fetchApplications(); }, [fetchApplications]);
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    fetchApplications();
+  }, [fetchApplications]);
 
   const handleWithdraw = async (appId: string) => {
     if (!confirm('Are you sure you want to withdraw this application?')) return;
