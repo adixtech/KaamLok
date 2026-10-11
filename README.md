@@ -377,7 +377,7 @@ npm run dev
 Frontend runs on:
 
 ```
-http://localhost:5173
+http://localhost:3000
 ```
 
 ---
@@ -385,7 +385,7 @@ http://localhost:5173
 # 🤝 Contributing
 
 This project is currently under private development.
-
+If you find any issues,list here we try to solve it...
 ---
 
 # 📜 License
